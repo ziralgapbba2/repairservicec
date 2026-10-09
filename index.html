@@ -5,61 +5,92 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AS 실적·매출 관리</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 :root{
-  --bg:#f4f6f9; --card:#ffffff; --ink:#1c2430; --sub:#5d6b7c; --line:#e2e7ee;
-  --brand:#1f5fbf; --brand-soft:#e7effb; --ok:#1e9e6a; --warn:#d98a12; --bad:#d64545;
-  --c1:#1f5fbf; --c2:#1e9e6a; --c3:#d98a12; --c4:#8a4fd1; --c5:#d64545; --c6:#2aa3b8; --c7:#7a8899;
+  /* J2L FLOW 지식베이스와 동일한 팔레트 */
+  --bg:#0f1117; --bg2:#181c27; --bg3:#1e2336; --panel:#242840;
+  --border:#2e3452; --accent:#4f7cff; --accent-glow:rgba(79,124,255,.18);
+  --text:#e8eaf2; --text2:#8b90aa; --text3:#565b75;
+  --success:#3dd68c; --warning:#f5a623; --danger:#ff5c5c;
+  /* 차트 */
+  --c1:#4f7cff; --c2:#7d9dff; --c3:#3dd68c; --c4:#f5a623; --c5:#a78bfa; --c6:#38bdf8; --c7:#565b75;
+  --c-recv:#2e3f7a; --c-done:#4f7cff; --c-line:#3dd68c;
 }
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:'Noto Sans KR',system-ui,sans-serif;font-size:14px}
-header{background:var(--card);border-bottom:1px solid var(--line);padding:14px 20px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:5}
-header h1{font-size:18px;margin:0}
-header h1 small{font-weight:400;color:var(--sub);font-size:12px;margin-left:6px}
-.status{font-size:12px;padding:5px 10px;border-radius:999px;background:var(--brand-soft);color:var(--brand)}
-.status.warn{background:#fff3e0;color:var(--warn)}
-nav{display:flex;gap:4px;padding:10px 20px 0;max-width:1280px;margin:0 auto;flex-wrap:wrap}
-nav button{border:1px solid var(--line);border-bottom:none;background:#eef1f5;padding:9px 16px;border-radius:8px 8px 0 0;cursor:pointer;font:inherit;color:var(--sub)}
-nav button.active{background:var(--card);color:var(--ink);font-weight:700}
-main{max-width:1280px;margin:0 auto;padding:0 20px 40px}
-.tab{display:none;background:var(--card);border:1px solid var(--line);border-radius:0 10px 10px 10px;padding:18px}
+html{color-scheme:dark}
+body{margin:0;background:var(--bg);color:var(--text);font-family:'Noto Sans KR',system-ui,sans-serif;font-size:14px;line-height:1.5}
+header{position:sticky;top:0;z-index:50;background:rgba(15,17,23,.95);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;padding:0 24px;min-height:56px}
+header h1{font-size:15px;margin:0;font-weight:600;color:var(--text)}
+header h1 .logo{font-family:'JetBrains Mono',monospace;color:var(--accent);font-weight:600;margin-right:10px}
+header h1 .logo span{color:var(--text2);font-weight:400}
+header h1 small{display:none}
+.status{font-size:12px;padding:5px 12px;border-radius:6px;border:1px solid var(--border);color:var(--text2);background:var(--bg2)}
+.status.warn{color:var(--warning);border-color:rgba(245,166,35,.45);background:rgba(245,166,35,.08)}
+nav{display:flex;gap:4px;padding:16px 24px 0;max-width:1320px;margin:0 auto;flex-wrap:wrap}
+nav button{border:1px solid transparent;background:none;padding:8px 16px;border-radius:8px;cursor:pointer;font:inherit;font-size:13px;font-weight:500;color:var(--text2);transition:all .12s}
+nav button:hover{background:var(--bg3);color:var(--text)}
+nav button.active{background:var(--accent-glow);color:var(--accent);border-color:rgba(79,124,255,.35)}
+main{max-width:1320px;margin:0 auto;padding:12px 24px 48px}
+.tab{display:none;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px}
 .tab.active{display:block}
 .row{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
-.field{display:flex;flex-direction:column;gap:4px}
-.field label{font-size:12px;color:var(--sub)}
-input,select{font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink)}
-input[type=number]{text-align:right}
-button.btn{font:inherit;padding:8px 14px;border-radius:6px;border:1px solid var(--brand);background:var(--brand);color:#fff;cursor:pointer}
-button.btn.ghost{background:#fff;color:var(--brand)}
-button.btn.danger{background:#fff;color:var(--bad);border-color:var(--bad)}
-button.btn.sm{padding:4px 9px;font-size:12px}
-h2{font-size:15px;margin:22px 0 10px}
+.field{display:flex;flex-direction:column;gap:5px}
+.field label{font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.1em}
+input,select{font:inherit;font-size:13px;padding:8px 11px;border:1px solid var(--border);border-radius:8px;background:var(--bg3);color:var(--text);outline:none;transition:border-color .15s}
+input:focus,select:focus{border-color:var(--accent)}
+input::placeholder{color:var(--text3)}
+input[type=number]{text-align:right;font-family:'JetBrains Mono',monospace}
+select option{background:var(--bg2)}
+button.btn{font:inherit;font-size:13px;font-weight:600;padding:8px 16px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:#fff;cursor:pointer;transition:all .12s}
+button.btn:hover{box-shadow:0 0 0 3px var(--accent-glow)}
+button.btn.ghost{background:transparent;color:var(--accent);border-color:var(--border)}
+button.btn.ghost:hover{border-color:var(--accent)}
+button.btn.danger{background:transparent;color:var(--danger);border-color:rgba(255,92,92,.4)}
+button.btn.danger:hover{border-color:var(--danger);box-shadow:0 0 0 3px rgba(255,92,92,.12)}
+button.btn.sm{padding:3px 10px;font-size:11px;border-radius:6px}
+h2{font-size:15px;font-weight:700;margin:26px 0 12px;color:var(--text)}
 h2:first-child{margin-top:0}
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:14px 0}
-.kpi{border:1px solid var(--line);border-radius:10px;padding:12px 14px}
-.kpi .l{font-size:12px;color:var(--sub)}
-.kpi .v{font-size:22px;font-weight:700;margin-top:4px}
-.kpi .s{font-size:12px;color:var(--sub);margin-top:2px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:16px 0}
+.kpi{background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+.kpi:first-child{border-color:rgba(79,124,255,.5);background:linear-gradient(135deg,rgba(79,124,255,.22),var(--bg3))}
+.kpi .l{font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.1em}
+.kpi .v{font-size:22px;font-weight:700;margin-top:6px;color:var(--text);font-family:'JetBrains Mono','Noto Sans KR',monospace;letter-spacing:-.5px}
+.kpi:first-child .v{color:var(--accent)}
+.kpi .s{font-size:11px;color:var(--text2);margin-top:3px}
 .grid2{display:grid;grid-template-columns:2fr 1fr;gap:14px}
-.box{border:1px solid var(--line);border-radius:10px;padding:12px}
-.chartwrap{position:relative;height:300px}
-.tablewrap{overflow-x:auto}
-table{width:100%;border-collapse:collapse;font-size:13px}
-th,td{padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
-th{background:#f7f9fb;color:var(--sub);font-weight:500;text-align:left}
+.box{background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:14px}
+.chartwrap{position:relative;height:300px;margin-top:6px}
+.tablewrap{overflow-x:auto;border:1px solid var(--border);border-radius:10px}
+.tablewrap:empty{border:none}
+.tablewrap .empty{border:none}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{padding:8px 12px;border-bottom:1px solid rgba(46,52,82,.6);white-space:nowrap}
+th{background:var(--bg3);color:var(--text3);font-size:11px;font-weight:600;letter-spacing:.06em;text-align:left}
+td{color:var(--text2)}
+td.n{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text)}
 td.n,th.n{text-align:right}
-tr.sum td{font-weight:700;background:#fafbfc}
-td input{width:90px;padding:5px 7px}
-td input.wide{width:160px}
-.muted{color:var(--sub);font-size:12px}
-.empty{padding:30px;text-align:center;color:var(--sub)}
-.note{background:#f7f9fb;border:1px solid var(--line);border-radius:8px;padding:12px 14px;line-height:1.7;font-size:13px}
+tbody tr:hover td{background:rgba(30,35,54,.7)}
+tr.sum td{font-weight:700;background:var(--panel);color:var(--accent);border-bottom:none}
+td input{width:90px;padding:5px 8px;font-size:12px}
+td input.wide{width:170px}
+.muted{color:var(--text3);font-size:12px}
+.empty{padding:40px;text-align:center;color:var(--text3);border:1px dashed var(--border);border-radius:10px}
+.note{background:var(--bg3);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:8px;padding:14px 16px;line-height:1.8;font-size:13px;color:var(--text2)}
+.note b{color:var(--text)}
 .note ol{margin:6px 0 0;padding-left:20px}
-.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1c2430;color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;display:none;z-index:20}
-.badge{display:inline-block;padding:1px 7px;border-radius:999px;font-size:11px;background:var(--brand-soft);color:var(--brand)}
-@media (max-width:860px){.grid2{grid-template-columns:1fr} header{position:static}}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--panel);border:1px solid var(--accent);color:var(--text);padding:10px 18px;border-radius:9px;font-size:13px;display:none;z-index:200;box-shadow:0 8px 24px rgba(79,124,255,.2)}
+.seg{display:inline-flex;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:3px;gap:2px}
+.seg button{font:inherit;font-size:12px;border:none;background:none;color:var(--text2);padding:5px 14px;border-radius:6px;cursor:pointer}
+.seg button.on{background:var(--accent-glow);color:var(--accent);font-weight:600}
+tr.click{cursor:pointer}
+tbody tr.click:hover td{background:var(--accent-glow);color:var(--text)}
+tr.zero td,tr.zero td.n{color:var(--text3)}
+td.sat{color:#7d9dff} td.sun{color:var(--danger)}
+#dataInfo b{color:var(--warning)!important}
+.badge{display:inline-block;padding:1px 7px;border-radius:5px;font-size:10px;background:var(--accent-glow);color:var(--accent)}
+@media (max-width:860px){.grid2{grid-template-columns:1fr} header{position:static} main,nav{padding-left:16px;padding-right:16px}}
 </style>
 </head>
 <body>
@@ -68,7 +99,7 @@ td input.wide{width:160px}
 <script type="application/json" id="embedded-data">null</script>
 
 <header>
-  <h1>AS 실적·매출 관리 <small>J2L FLOW</small></h1>
+  <h1><span class="logo">J2L<span>FLOW</span></span>AS 실적·매출 관리</h1>
   <span class="status" id="saveStatus">-</span>
 </header>
 
@@ -92,6 +123,14 @@ td input.wide{width:160px}
       <div class="box"><div class="muted" id="trendTitle">월별 접수·처리·매출</div><div class="chartwrap"><canvas id="chTrend"></canvas></div></div>
       <div class="box"><div class="muted" id="shareTitle">매출 비중</div><div class="chartwrap"><canvas id="chShare"></canvas></div></div>
     </div>
+    <div class="row" style="justify-content:space-between;margin-top:22px">
+      <h2 id="periodTitle" style="margin:0">월별 실적</h2>
+      <div class="seg" id="periodSeg">
+        <button data-view="month">월별</button><button data-view="day">일자별</button>
+      </div>
+    </div>
+    <p class="muted" id="periodHint" style="margin:6px 0 8px"></p>
+    <div class="tablewrap" id="tblPeriod"></div>
     <h2>고객사별 현황</h2>
     <div class="tablewrap" id="tblCust"></div>
     <h2>모델별 현황</h2>
@@ -266,14 +305,19 @@ function renderDashboard(){
     kpi('매출', won(money), '처리 1건당 ' + (done ? won(money/done) : '-')) +
     kpi('입력 일수', fmt(nDays)+'일', '일평균 매출 ' + (nDays ? won(money/nDays) : '-'));
 
-  // 월별 추이
+  // 추이: 월 선택 시 일자별, 아니면 월별
+  var daily = !!(y && m);
   var keys = [];
-  if (y){ for (var i=1;i<=12;i++) keys.push(y+'-'+(i<10?'0':'')+i); }
+  if (daily){ var last = new Date(Number(y), Number(m), 0).getDate(); for (var d=1; d<=last; d++) keys.push(y+'-'+m+'-'+(d<10?'0':'')+d); }
+  else if (y){ for (var i=1;i<=12;i++) keys.push(y+'-'+(i<10?'0':'')+i); }
   else { var s={}; inYC.forEach(function(r){ s[r.date.slice(0,7)]=1; }); keys = Object.keys(s).sort(); }
+  var klen = daily ? 10 : 7;
   var agg = {}; keys.forEach(function(k){ agg[k]={recv:0,done:0,money:0}; });
-  inYC.forEach(function(r){ var k=r.date.slice(0,7); if(agg[k]){ agg[k].recv+=num(r.recv); agg[k].done+=num(r.done); agg[k].money+=rev(r); } });
-  $('#trendTitle').textContent = (y ? y+'년 ' : '') + '월별 접수·처리·매출' + (c ? ' — ' + cust(c).name : '');
-  drawTrend(keys, agg);
+  (daily ? rows : inYC).forEach(function(r){ var k=r.date.slice(0,klen); if(agg[k]){ agg[k].recv+=num(r.recv); agg[k].done+=num(r.done); agg[k].money+=rev(r); } });
+  var cname = c ? ' — ' + cust(c).name : '';
+  $('#trendTitle').textContent = daily ? (y+'년 '+Number(m)+'월 일자별 접수·처리·매출'+cname) : ((y ? y+'년 ' : '') + '월별 접수·처리·매출' + cname + ' · 막대를 누르면 일자별로 봅니다');
+  drawTrend(keys, agg, daily);
+  renderPeriodTable(keys, agg, daily);
 
   // 비중 (고객사 선택 시 모델별)
   var share = {};
@@ -310,22 +354,52 @@ function renderDashboard(){
 }
 function kpi(l,v,s){ return '<div class="kpi"><div class="l">'+l+'</div><div class="v">'+v+'</div><div class="s">'+esc(s)+'</div></div>'; }
 function cssVar(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
-function drawTrend(keys, agg){
+if (typeof Chart !== 'undefined'){ Chart.defaults.color = '#8b90aa'; Chart.defaults.borderColor = 'rgba(46,52,82,.7)'; Chart.defaults.font.family = "'Noto Sans KR', sans-serif"; }
+var WD = ['일','월','화','수','목','금','토'];
+function wday(k){ return new Date(Number(k.slice(0,4)), Number(k.slice(5,7))-1, Number(k.slice(8,10))).getDay(); }
+function drillMonth(k){
+  $('#fYear').value = k.slice(0,4); $('#fMonth').value = k.slice(5,7); renderDashboard();
+}
+function renderPeriodTable(keys, agg, daily){
+  var y = $('#fYear').value, m = $('#fMonth').value;
+  document.querySelectorAll('#periodSeg button').forEach(function(b){ b.classList.toggle('on', (b.dataset.view==='day')===daily); });
+  $('#periodTitle').textContent = daily ? (y+'년 '+Number(m)+'월 일자별 실적') : ((y ? y+'년 ' : '전체 기간 ') + '월별 실적');
+  $('#periodHint').textContent = daily ? '실적이 없는 날은 흐리게 표시됩니다.' : '행을 누르면 해당 월의 일자별 실적으로 이동합니다.';
+  if (!keys.length){ $('#tblPeriod').innerHTML = '<div class="empty">입력된 실적이 없습니다.</div>'; return; }
+  var t = {recv:0,done:0,money:0}, cum = 0;
+  var h = '<table><thead><tr><th>'+(daily?'일자':'월')+'</th>'+(daily?'<th>요일</th>':'')+'<th class="n">접수</th><th class="n">처리</th><th class="n">처리율</th><th class="n">미처리</th><th class="n">매출</th><th class="n">누적 매출</th></tr></thead><tbody>';
+  keys.forEach(function(k){
+    var o = agg[k]; cum += o.money; t.recv+=o.recv; t.done+=o.done; t.money+=o.money;
+    var empty = !o.recv && !o.done && !o.money;
+    var cls = (empty ? 'zero' : '') + (daily ? '' : ' click');
+    var label, wcell = '';
+    if (daily){ var w = wday(k); label = Number(k.slice(5,7))+'/'+Number(k.slice(8,10)); wcell = '<td class="'+(w===0?'sun':w===6?'sat':'')+'">'+WD[w]+'</td>'; }
+    else label = (y ? '' : k.slice(0,4)+'년 ') + Number(k.slice(5,7))+'월';
+    h += '<tr class="'+cls+'"'+(daily?'':' data-month="'+k+'"')+'><td>'+label+'</td>'+wcell+'<td class="n">'+fmt(o.recv)+'</td><td class="n">'+fmt(o.done)+'</td><td class="n">'+pct(o.done,o.recv)+'</td><td class="n">'+fmt(Math.max(o.recv-o.done,0))+'</td><td class="n">'+won(o.money)+'</td><td class="n">'+won(cum)+'</td></tr>';
+  });
+  h += '<tr class="sum"><td'+(daily?' colspan="2"':'')+'>합계</td><td class="n">'+fmt(t.recv)+'</td><td class="n">'+fmt(t.done)+'</td><td class="n">'+pct(t.done,t.recv)+'</td><td class="n">'+fmt(Math.max(t.recv-t.done,0))+'</td><td class="n">'+won(t.money)+'</td><td></td></tr></tbody></table>';
+  $('#tblPeriod').innerHTML = h;
+}
+function drawTrend(keys, agg, daily){
   if (typeof Chart === 'undefined') return;
   if (charts.trend) charts.trend.destroy();
   charts.trend = new Chart($('#chTrend'), {
     data: {
-      labels: keys.map(function(k){ return Number(k.slice(5,7)) + '월' + (keys.length>12 || !$('#fYear').value ? ' ('+k.slice(2,4)+')' : ''); }),
+      labels: keys.map(function(k){ return daily ? Number(k.slice(8,10)) + '일' : Number(k.slice(5,7)) + '월' + (keys.length>12 || !$('#fYear').value ? ' ('+k.slice(2,4)+')' : ''); }),
       datasets: [
-        { type:'bar', label:'접수', data:keys.map(function(k){return agg[k].recv;}), backgroundColor:cssVar('--c7'), yAxisID:'y' },
-        { type:'bar', label:'처리', data:keys.map(function(k){return agg[k].done;}), backgroundColor:cssVar('--c1'), yAxisID:'y' },
-        { type:'line', label:'매출', data:keys.map(function(k){return agg[k].money;}), borderColor:cssVar('--c3'), backgroundColor:cssVar('--c3'), yAxisID:'y1', tension:.25 }
+        { type:'bar', label:'접수', data:keys.map(function(k){return agg[k].recv;}), backgroundColor:cssVar('--c-recv'), borderRadius:3, yAxisID:'y' },
+        { type:'bar', label:'처리', data:keys.map(function(k){return agg[k].done;}), backgroundColor:cssVar('--c-done'), borderRadius:3, yAxisID:'y' },
+        { type:'line', label:'매출', data:keys.map(function(k){return agg[k].money;}), borderColor:cssVar('--c-line'), backgroundColor:cssVar('--c-line'), yAxisID:'y1', tension:.25, borderWidth:2.5, pointRadius:3 }
       ]
     },
     options: {
       responsive:true, maintainAspectRatio:false, animation:false,
       interaction:{ mode:'index', intersect:false },
-      plugins:{ tooltip:{ callbacks:{ label:function(ctx){ return ctx.dataset.label + ': ' + (ctx.dataset.yAxisID==='y1' ? won(ctx.raw) : fmt(ctx.raw)+'건'); } } } },
+      onClick:function(evt, els){ if (!daily && els && els.length) drillMonth(keys[els[0].index]); },
+      onHover:function(evt, els){ evt.native.target.style.cursor = (!daily && els && els.length) ? 'pointer' : 'default'; },
+      plugins:{ tooltip:{ callbacks:{
+        title:function(items){ var k = keys[items[0].dataIndex]; return daily ? (Number(k.slice(5,7))+'월 '+Number(k.slice(8,10))+'일 ('+WD[wday(k)]+')') : items[0].label; },
+        label:function(ctx){ return ctx.dataset.label + ': ' + (ctx.dataset.yAxisID==='y1' ? won(ctx.raw) : fmt(ctx.raw)+'건'); } } } },
       scales:{
         y:{ beginAtZero:true, title:{display:true,text:'건수'} },
         y1:{ beginAtZero:true, position:'right', grid:{drawOnChartArea:false}, title:{display:true,text:'매출(원)'}, ticks:{ callback:function(v){ return v>=10000 ? fmt(v/10000)+'만' : fmt(v); } } }
@@ -340,7 +414,7 @@ function drawShare(share){
   var pal = ['--c1','--c2','--c3','--c4','--c5','--c6','--c7'].map(cssVar);
   charts.share = new Chart($('#chShare'), {
     type:'doughnut',
-    data:{ labels:keys, datasets:[{ data:keys.map(function(k){return share[k];}), backgroundColor:keys.map(function(_,i){ return pal[i%pal.length]; }) }] },
+    data:{ labels:keys, datasets:[{ data:keys.map(function(k){return share[k];}), backgroundColor:keys.map(function(_,i){ return pal[i%pal.length]; }), borderColor:cssVar('--bg3'), borderWidth:2 }] },
     options:{ responsive:true, maintainAspectRatio:false, animation:false,
       plugins:{ legend:{position:'bottom'}, tooltip:{ callbacks:{ label:function(ctx){ return ctx.label + ': ' + won(ctx.raw); } } } } }
   });
@@ -508,6 +582,18 @@ function bind(){
     if (b.dataset.tab==='dash') renderDashboard();
   });
   ['#fYear','#fMonth','#fCust'].forEach(function(s){ $(s).addEventListener('change', renderDashboard); });
+  $('#periodSeg').addEventListener('click', function(e){
+    var b = e.target.closest('button[data-view]'); if (!b) return;
+    if (b.dataset.view==='month'){ $('#fMonth').value = ''; renderDashboard(); return; }
+    if ($('#fYear').value && $('#fMonth').value) return;
+    var y = $('#fYear').value || today().slice(0,4), mo;
+    if (y === today().slice(0,4)) mo = today().slice(5,7);
+    else { var ds = DB.records.filter(function(r){ return r.date.slice(0,4)===y; }).map(function(r){ return r.date; }).sort(); mo = ds.length ? ds[ds.length-1].slice(5,7) : '01'; }
+    drillMonth(y+'-'+mo);
+  });
+  $('#tblPeriod').addEventListener('click', function(e){
+    var tr = e.target.closest('tr[data-month]'); if (tr) drillMonth(tr.dataset.month);
+  });
   $('#eDate').addEventListener('change', renderEntry);
   $('#eCust').addEventListener('change', renderEntry);
   $('#entryGrid').addEventListener('input', updateEntrySums);
