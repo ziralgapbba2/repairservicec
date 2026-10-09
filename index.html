@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AS 실적·매출 관리</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#f4f6f9; --card:#ffffff; --ink:#1c2430; --sub:#5d6b7c; --line:#e2e7ee;
+  --brand:#1f5fbf; --brand-soft:#e7effb; --ok:#1e9e6a; --warn:#d98a12; --bad:#d64545;
+  --c1:#1f5fbf; --c2:#1e9e6a; --c3:#d98a12; --c4:#8a4fd1; --c5:#d64545; --c6:#2aa3b8; --c7:#7a8899;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'Noto Sans KR',system-ui,sans-serif;font-size:14px}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:14px 20px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:5}
+header h1{font-size:18px;margin:0}
+header h1 small{font-weight:400;color:var(--sub);font-size:12px;margin-left:6px}
+.status{font-size:12px;padding:5px 10px;border-radius:999px;background:var(--brand-soft);color:var(--brand)}
+.status.warn{background:#fff3e0;color:var(--warn)}
+nav{display:flex;gap:4px;padding:10px 20px 0;max-width:1280px;margin:0 auto;flex-wrap:wrap}
+nav button{border:1px solid var(--line);border-bottom:none;background:#eef1f5;padding:9px 16px;border-radius:8px 8px 0 0;cursor:pointer;font:inherit;color:var(--sub)}
+nav button.active{background:var(--card);color:var(--ink);font-weight:700}
+main{max-width:1280px;margin:0 auto;padding:0 20px 40px}
+.tab{display:none;background:var(--card);border:1px solid var(--line);border-radius:0 10px 10px 10px;padding:18px}
+.tab.active{display:block}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:12px;color:var(--sub)}
+input,select{font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink)}
+input[type=number]{text-align:right}
+button.btn{font:inherit;padding:8px 14px;border-radius:6px;border:1px solid var(--brand);background:var(--brand);color:#fff;cursor:pointer}
+button.btn.ghost{background:#fff;color:var(--brand)}
+button.btn.danger{background:#fff;color:var(--bad);border-color:var(--bad)}
+button.btn.sm{padding:4px 9px;font-size:12px}
+h2{font-size:15px;margin:22px 0 10px}
+h2:first-child{margin-top:0}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:14px 0}
+.kpi{border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.kpi .l{font-size:12px;color:var(--sub)}
+.kpi .v{font-size:22px;font-weight:700;margin-top:4px}
+.kpi .s{font-size:12px;color:var(--sub);margin-top:2px}
+.grid2{display:grid;grid-template-columns:2fr 1fr;gap:14px}
+.box{border:1px solid var(--line);border-radius:10px;padding:12px}
+.chartwrap{position:relative;height:300px}
+.tablewrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{background:#f7f9fb;color:var(--sub);font-weight:500;text-align:left}
+td.n,th.n{text-align:right}
+tr.sum td{font-weight:700;background:#fafbfc}
+td input{width:90px;padding:5px 7px}
+td input.wide{width:160px}
+.muted{color:var(--sub);font-size:12px}
+.empty{padding:30px;text-align:center;color:var(--sub)}
+.note{background:#f7f9fb;border:1px solid var(--line);border-radius:8px;padding:12px 14px;line-height:1.7;font-size:13px}
+.note ol{margin:6px 0 0;padding-left:20px}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1c2430;color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;display:none;z-index:20}
+.badge{display:inline-block;padding:1px 7px;border-radius:999px;font-size:11px;background:var(--brand-soft);color:var(--brand)}
+@media (max-width:860px){.grid2{grid-template-columns:1fr} header{position:static}}
+</style>
+</head>
+<body>
+
+<!-- 저장된 데이터 (HTML 다운로드 시 이 부분이 자동으로 갱신됩니다) -->
+<script type="application/json" id="embedded-data">null</script>
+
+<header>
+  <h1>AS 실적·매출 관리 <small>J2L FLOW</small></h1>
+  <span class="status" id="saveStatus">-</span>
+</header>
+
+<nav id="tabs">
+  <button data-tab="dash" class="active">대시보드</button>
+  <button data-tab="entry">실적 입력</button>
+  <button data-tab="master">고객사·모델 관리</button>
+  <button data-tab="data">데이터 저장</button>
+</nav>
+
+<main>
+  <!-- 대시보드 -->
+  <section class="tab active" id="tab-dash">
+    <div class="row">
+      <div class="field"><label>연도</label><select id="fYear"></select></div>
+      <div class="field"><label>월</label><select id="fMonth"></select></div>
+      <div class="field"><label>고객사</label><select id="fCust"></select></div>
+    </div>
+    <div class="kpis" id="kpis"></div>
+    <div class="grid2">
+      <div class="box"><div class="muted" id="trendTitle">월별 접수·처리·매출</div><div class="chartwrap"><canvas id="chTrend"></canvas></div></div>
+      <div class="box"><div class="muted" id="shareTitle">매출 비중</div><div class="chartwrap"><canvas id="chShare"></canvas></div></div>
+    </div>
+    <h2>고객사별 현황</h2>
+    <div class="tablewrap" id="tblCust"></div>
+    <h2>모델별 현황</h2>
+    <div class="tablewrap" id="tblModel"></div>
+  </section>
+
+  <!-- 실적 입력 -->
+  <section class="tab" id="tab-entry">
+    <h2>일자별 실적 입력</h2>
+    <div class="row">
+      <div class="field"><label>일자</label><input type="date" id="eDate"></div>
+      <div class="field"><label>고객사</label><select id="eCust"></select></div>
+      <button class="btn" id="btnSaveEntry">저장</button>
+    </div>
+    <p class="muted">선택한 일자·고객사의 모델별 접수·처리 건수를 입력하세요. 이미 입력된 값이 있으면 불러와서 수정됩니다. 모두 0으로 두면 해당 행은 삭제됩니다.</p>
+    <div class="tablewrap" id="entryGrid"></div>
+
+    <h2>입력 내역</h2>
+    <div class="row">
+      <div class="field"><label>월</label><input type="month" id="lMonth"></div>
+      <div class="field"><label>고객사</label><select id="lCust"></select></div>
+    </div>
+    <div class="tablewrap" id="recList" style="margin-top:10px"></div>
+  </section>
+
+  <!-- 고객사·모델 관리 -->
+  <section class="tab" id="tab-master">
+    <h2>고객사</h2>
+    <div class="row">
+      <div class="field"><label>고객사명</label><input id="cName" placeholder="예: 현대렌탈케어"></div>
+      <div class="field"><label>메모</label><input id="cMemo" placeholder="계약 조건 등 (선택)"></div>
+      <button class="btn" id="btnAddCust">고객사 추가</button>
+    </div>
+    <div class="tablewrap" id="custList" style="margin-top:10px"></div>
+
+    <h2>모델</h2>
+    <div class="row">
+      <div class="field"><label>고객사</label><select id="mCust"></select></div>
+      <div class="field"><label>제품군</label><input id="mProd" placeholder="예: 정수기"></div>
+      <div class="field"><label>모델명</label><input id="mName" placeholder="예: HQ-1234"></div>
+      <div class="field"><label>처리 단가(원/건)</label><input type="number" id="mPrice" min="0" step="100" value="0"></div>
+      <button class="btn" id="btnAddModel">모델 추가</button>
+    </div>
+    <p class="muted">단가를 바꾸면 이후 입력분부터 적용됩니다. 이미 입력된 실적은 입력 당시 단가로 유지됩니다.</p>
+    <div class="tablewrap" id="modelList"></div>
+  </section>
+
+  <!-- 데이터 저장 -->
+  <section class="tab" id="tab-data">
+    <h2>저장 방식</h2>
+    <div class="note">
+      입력한 내용은 이 브라우저에 자동 저장됩니다. 다른 사람이나 다른 PC에서도 같은 데이터를 보려면 GitHub의 파일을 바꿔야 합니다.
+      <ol>
+        <li><b>데이터 포함 HTML 다운로드</b>를 누릅니다. 현재 데이터가 들어간 HTML 파일이 받아집니다.</li>
+        <li>GitHub 리포지토리에서 기존 파일을 받은 파일로 덮어써서 커밋합니다 (파일명 동일하게).</li>
+        <li>몇 분 뒤 GitHub Pages 주소로 접속하면 모두에게 새 데이터가 보입니다.</li>
+      </ol>
+    </div>
+    <div class="row" style="margin-top:14px">
+      <button class="btn" id="btnDlHtml">데이터 포함 HTML 다운로드</button>
+      <button class="btn ghost" id="btnDlJson">JSON 백업</button>
+      <button class="btn ghost" id="btnImport">JSON 불러오기</button>
+      <input type="file" id="fileImport" accept=".json,application/json" style="display:none">
+    </div>
+    <div id="dataInfo" class="muted" style="margin-top:12px;line-height:1.8"></div>
+    <h2>초기화</h2>
+    <div class="row">
+      <button class="btn danger" id="btnRevert">이 브라우저 변경분 버리기 (HTML에 저장된 데이터로 복귀)</button>
+      <button class="btn danger" id="btnWipe">전체 데이터 삭제</button>
+    </div>
+  </section>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// 최초 상태의 HTML (렌더링 전) — "데이터 포함 HTML 다운로드"에 사용
+var ORIGINAL_HTML = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+
+(function(){
+'use strict';
+var LS_KEY = 'j2l_as_revenue_v1';
+var LS_EXPORT = 'j2l_as_revenue_exported_at';
+var DB, EMBEDDED = null;
+var charts = {};
+
+function $(s){ return document.querySelector(s); }
+function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function num(v){ var n = Number(String(v).replace(/,/g,'')); return isFinite(n) ? n : 0; }
+function fmt(n){ return Math.round(n).toLocaleString('ko-KR'); }
+function won(n){ return fmt(n) + '원'; }
+function pct(a,b){ return b ? (a/b*100).toFixed(1) + '%' : '-'; }
+function today(){ var d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
+function rev(r){ return num(r.done)*num(r.price) + num(r.extra); }
+function toast(msg){ var t = $('#toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(toast._t); toast._t = setTimeout(function(){ t.style.display='none'; }, 2200); }
+function emptyDB(){ return { version:1, savedAt:0, customers:[], models:[], records:[] }; }
+function valid(d){ return d && Array.isArray(d.customers) && Array.isArray(d.models) && Array.isArray(d.records); }
+function cust(id){ return DB.customers.find(function(c){ return c.id===id; }); }
+function model(id){ return DB.models.find(function(m){ return m.id===id; }); }
+function lsGet(k){ try { return localStorage.getItem(k); } catch(e){ return null; } }
+function lsSet(k,v){ try { localStorage.setItem(k,v); return true; } catch(e){ return false; } }
+function lsDel(k){ try { localStorage.removeItem(k); } catch(e){} }
+
+// ---------- 로드 / 저장 ----------
+function load(){
+  try { EMBEDDED = JSON.parse($('#embedded-data').textContent); } catch(e){ EMBEDDED = null; }
+  if (!valid(EMBEDDED)) EMBEDDED = null;
+  var local = null;
+  try { local = JSON.parse(lsGet(LS_KEY) || 'null'); } catch(e){}
+  if (!valid(local)) local = null;
+  if (local && (!EMBEDDED || num(local.savedAt) >= num(EMBEDDED.savedAt))) DB = local;
+  else DB = EMBEDDED ? JSON.parse(JSON.stringify(EMBEDDED)) : emptyDB();
+}
+function save(msg){
+  DB.savedAt = Date.now();
+  if (!lsSet(LS_KEY, JSON.stringify(DB))) toast('브라우저 저장에 실패했습니다. JSON 백업을 받아두세요.');
+  else if (msg) toast(msg);
+  renderAll();
+}
+function hasUnexported(){
+  var emb = EMBEDDED ? num(EMBEDDED.savedAt) : 0;
+  var exp = num(lsGet(LS_EXPORT));
+  return num(DB.savedAt) > Math.max(emb, exp);
+}
+function renderStatus(){
+  var el = $('#saveStatus');
+  if (hasUnexported()){ el.className = 'status warn'; el.textContent = '브라우저에만 저장됨 · GitHub 반영 전'; }
+  else { el.className = 'status'; el.textContent = DB.savedAt ? '저장됨 · ' + new Date(DB.savedAt).toLocaleString('ko-KR') : '데이터 없음'; }
+}
+
+// ---------- 공통 셀렉트 ----------
+function custOptions(sel, withAll){
+  var cur = sel.value;
+  var h = withAll ? '<option value="">전체 고객사</option>' : '';
+  DB.customers.forEach(function(c){ h += '<option value="'+c.id+'">'+esc(c.name)+'</option>'; });
+  if (!withAll && !DB.customers.length) h = '<option value="">고객사를 먼저 등록하세요</option>';
+  sel.innerHTML = h;
+  if ([].some.call(sel.options, function(o){ return o.value===cur; })) sel.value = cur;
+}
+
+// ---------- 대시보드 ----------
+function renderFilters(){
+  var ys = {}; ys[today().slice(0,4)] = 1;
+  DB.records.forEach(function(r){ ys[r.date.slice(0,4)] = 1; });
+  var fy = $('#fYear'), cur = fy.value;
+  fy.innerHTML = '<option value="">전체</option>' + Object.keys(ys).sort().reverse().map(function(y){ return '<option value="'+y+'">'+y+'년</option>'; }).join('');
+  fy.value = (cur !== undefined && [].some.call(fy.options, function(o){ return o.value===cur; }) && fy.dataset.init) ? cur : today().slice(0,4);
+  fy.dataset.init = 1;
+  var fm = $('#fMonth');
+  if (!fm.options.length){
+    var h = '<option value="">전체</option>';
+    for (var i=1;i<=12;i++){ var m = (i<10?'0':'')+i; h += '<option value="'+m+'">'+i+'월</option>'; }
+    fm.innerHTML = h;
+  }
+  custOptions($('#fCust'), true);
+}
+function renderDashboard(){
+  var y = $('#fYear').value, m = $('#fMonth').value, c = $('#fCust').value;
+  var inYC = DB.records.filter(function(r){ return (!y || r.date.slice(0,4)===y) && (!c || r.cid===c); });
+  var rows = inYC.filter(function(r){ return !m || r.date.slice(5,7)===m; });
+
+  var recv=0, done=0, money=0;
+  rows.forEach(function(r){ recv += num(r.recv); done += num(r.done); money += rev(r); });
+  var days = {}; rows.forEach(function(r){ days[r.date]=1; });
+  var nDays = Object.keys(days).length;
+  var label = (y ? y+'년 ' : '전체 기간 ') + (m ? Number(m)+'월' : '');
+  $('#kpis').innerHTML =
+    kpi('접수 건수', fmt(recv)+'건', label) +
+    kpi('처리 건수', fmt(done)+'건', '처리율 ' + pct(done, recv)) +
+    kpi('미처리 잔량', fmt(Math.max(recv-done,0))+'건', '접수 − 처리') +
+    kpi('매출', won(money), '처리 1건당 ' + (done ? won(money/done) : '-')) +
+    kpi('입력 일수', fmt(nDays)+'일', '일평균 매출 ' + (nDays ? won(money/nDays) : '-'));
+
+  // 월별 추이
+  var keys = [];
+  if (y){ for (var i=1;i<=12;i++) keys.push(y+'-'+(i<10?'0':'')+i); }
+  else { var s={}; inYC.forEach(function(r){ s[r.date.slice(0,7)]=1; }); keys = Object.keys(s).sort(); }
+  var agg = {}; keys.forEach(function(k){ agg[k]={recv:0,done:0,money:0}; });
+  inYC.forEach(function(r){ var k=r.date.slice(0,7); if(agg[k]){ agg[k].recv+=num(r.recv); agg[k].done+=num(r.done); agg[k].money+=rev(r); } });
+  $('#trendTitle').textContent = (y ? y+'년 ' : '') + '월별 접수·처리·매출' + (c ? ' — ' + cust(c).name : '');
+  drawTrend(keys, agg);
+
+  // 비중 (고객사 선택 시 모델별)
+  var share = {};
+  rows.forEach(function(r){
+    var key = c ? (model(r.mid) ? model(r.mid).name : '(삭제된 모델)') : (cust(r.cid) ? cust(r.cid).name : '(삭제된 고객사)');
+    share[key] = (share[key]||0) + rev(r);
+  });
+  $('#shareTitle').textContent = (c ? '모델별' : '고객사별') + ' 매출 비중 (' + label.trim() + ')';
+  drawShare(share);
+
+  // 고객사별 표
+  var byC = {};
+  rows.forEach(function(r){ var o = byC[r.cid] = byC[r.cid] || {recv:0,done:0,money:0}; o.recv+=num(r.recv); o.done+=num(r.done); o.money+=rev(r); });
+  var ck = Object.keys(byC).sort(function(a,b){ return byC[b].money-byC[a].money; });
+  if (!ck.length) $('#tblCust').innerHTML = '<div class="empty">선택한 기간에 입력된 실적이 없습니다.</div>';
+  else {
+    var h = '<table><thead><tr><th>고객사</th><th class="n">접수</th><th class="n">처리</th><th class="n">처리율</th><th class="n">미처리</th><th class="n">매출</th><th class="n">비중</th></tr></thead><tbody>';
+    ck.forEach(function(k){ var o=byC[k]; h += '<tr><td>'+esc(cust(k)?cust(k).name:'(삭제됨)')+'</td><td class="n">'+fmt(o.recv)+'</td><td class="n">'+fmt(o.done)+'</td><td class="n">'+pct(o.done,o.recv)+'</td><td class="n">'+fmt(Math.max(o.recv-o.done,0))+'</td><td class="n">'+won(o.money)+'</td><td class="n">'+pct(o.money,money)+'</td></tr>'; });
+    h += '<tr class="sum"><td>합계</td><td class="n">'+fmt(recv)+'</td><td class="n">'+fmt(done)+'</td><td class="n">'+pct(done,recv)+'</td><td class="n">'+fmt(Math.max(recv-done,0))+'</td><td class="n">'+won(money)+'</td><td class="n">100%</td></tr></tbody></table>';
+    $('#tblCust').innerHTML = h;
+  }
+
+  // 모델별 표
+  var byM = {};
+  rows.forEach(function(r){ var o = byM[r.mid] = byM[r.mid] || {cid:r.cid,recv:0,done:0,money:0}; o.recv+=num(r.recv); o.done+=num(r.done); o.money+=rev(r); });
+  var mk = Object.keys(byM).sort(function(a,b){ return byM[b].money-byM[a].money; });
+  if (!mk.length) $('#tblModel').innerHTML = '<div class="empty">선택한 기간에 입력된 실적이 없습니다.</div>';
+  else {
+    var h2 = '<table><thead><tr><th>고객사</th><th>제품군</th><th>모델</th><th class="n">접수</th><th class="n">처리</th><th class="n">처리율</th><th class="n">매출</th></tr></thead><tbody>';
+    mk.forEach(function(k){ var o=byM[k], md=model(k), cc=cust(o.cid);
+      h2 += '<tr><td>'+esc(cc?cc.name:'(삭제됨)')+'</td><td>'+esc(md?md.product:'')+'</td><td>'+esc(md?md.name:'(삭제된 모델)')+'</td><td class="n">'+fmt(o.recv)+'</td><td class="n">'+fmt(o.done)+'</td><td class="n">'+pct(o.done,o.recv)+'</td><td class="n">'+won(o.money)+'</td></tr>'; });
+    $('#tblModel').innerHTML = h2 + '</tbody></table>';
+  }
+}
+function kpi(l,v,s){ return '<div class="kpi"><div class="l">'+l+'</div><div class="v">'+v+'</div><div class="s">'+esc(s)+'</div></div>'; }
+function cssVar(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+function drawTrend(keys, agg){
+  if (typeof Chart === 'undefined') return;
+  if (charts.trend) charts.trend.destroy();
+  charts.trend = new Chart($('#chTrend'), {
+    data: {
+      labels: keys.map(function(k){ return Number(k.slice(5,7)) + '월' + (keys.length>12 || !$('#fYear').value ? ' ('+k.slice(2,4)+')' : ''); }),
+      datasets: [
+        { type:'bar', label:'접수', data:keys.map(function(k){return agg[k].recv;}), backgroundColor:cssVar('--c7'), yAxisID:'y' },
+        { type:'bar', label:'처리', data:keys.map(function(k){return agg[k].done;}), backgroundColor:cssVar('--c1'), yAxisID:'y' },
+        { type:'line', label:'매출', data:keys.map(function(k){return agg[k].money;}), borderColor:cssVar('--c3'), backgroundColor:cssVar('--c3'), yAxisID:'y1', tension:.25 }
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false, animation:false,
+      interaction:{ mode:'index', intersect:false },
+      plugins:{ tooltip:{ callbacks:{ label:function(ctx){ return ctx.dataset.label + ': ' + (ctx.dataset.yAxisID==='y1' ? won(ctx.raw) : fmt(ctx.raw)+'건'); } } } },
+      scales:{
+        y:{ beginAtZero:true, title:{display:true,text:'건수'} },
+        y1:{ beginAtZero:true, position:'right', grid:{drawOnChartArea:false}, title:{display:true,text:'매출(원)'}, ticks:{ callback:function(v){ return v>=10000 ? fmt(v/10000)+'만' : fmt(v); } } }
+      }
+    }
+  });
+}
+function drawShare(share){
+  if (typeof Chart === 'undefined') return;
+  if (charts.share) charts.share.destroy();
+  var keys = Object.keys(share).filter(function(k){ return share[k]>0; }).sort(function(a,b){ return share[b]-share[a]; });
+  var pal = ['--c1','--c2','--c3','--c4','--c5','--c6','--c7'].map(cssVar);
+  charts.share = new Chart($('#chShare'), {
+    type:'doughnut',
+    data:{ labels:keys, datasets:[{ data:keys.map(function(k){return share[k];}), backgroundColor:keys.map(function(_,i){ return pal[i%pal.length]; }) }] },
+    options:{ responsive:true, maintainAspectRatio:false, animation:false,
+      plugins:{ legend:{position:'bottom'}, tooltip:{ callbacks:{ label:function(ctx){ return ctx.label + ': ' + won(ctx.raw); } } } } }
+  });
+}
+
+// ---------- 실적 입력 ----------
+function renderEntry(){
+  custOptions($('#eCust'), false);
+  var date = $('#eDate').value, cid = $('#eCust').value;
+  var ms = DB.models.filter(function(m){ return m.cid===cid; });
+  if (!DB.customers.length){ $('#entryGrid').innerHTML = '<div class="empty">"고객사·모델 관리" 탭에서 고객사와 모델을 먼저 등록하세요.</div>'; return; }
+  if (!ms.length){ $('#entryGrid').innerHTML = '<div class="empty">이 고객사에 등록된 모델이 없습니다. "고객사·모델 관리" 탭에서 모델을 추가하세요.</div>'; return; }
+  var h = '<table><thead><tr><th>제품군</th><th>모델</th><th class="n">접수</th><th class="n">처리</th><th class="n">단가(원)</th><th class="n">추가금액(원)</th><th>메모</th><th class="n">매출</th></tr></thead><tbody>';
+  ms.forEach(function(m){
+    var r = DB.records.find(function(x){ return x.date===date && x.mid===m.id; }) || {};
+    var price = r.id ? r.price : m.price;
+    h += '<tr data-mid="'+m.id+'"><td>'+esc(m.product)+'</td><td>'+esc(m.name)+'</td>'+
+      '<td class="n"><input type="number" min="0" data-k="recv" value="'+num(r.recv)+'"></td>'+
+      '<td class="n"><input type="number" min="0" data-k="done" value="'+num(r.done)+'"></td>'+
+      '<td class="n"><input type="number" min="0" step="100" data-k="price" value="'+num(price)+'"></td>'+
+      '<td class="n"><input type="number" step="100" data-k="extra" value="'+num(r.extra)+'"></td>'+
+      '<td><input class="wide" data-k="memo" value="'+esc(r.memo||'')+'"></td>'+
+      '<td class="n" data-rev>'+won(rev({done:r.done,price:price,extra:r.extra}))+'</td></tr>';
+  });
+  h += '<tr class="sum"><td colspan="2">합계</td><td class="n" id="sRecv"></td><td class="n" id="sDone"></td><td></td><td></td><td></td><td class="n" id="sRev"></td></tr></tbody></table>';
+  $('#entryGrid').innerHTML = h;
+  updateEntrySums();
+}
+function readRow(tr){
+  var o = {}; tr.querySelectorAll('input[data-k]').forEach(function(i){ o[i.dataset.k] = i.dataset.k==='memo' ? i.value.trim() : num(i.value); }); return o;
+}
+function updateEntrySums(){
+  var sr=0, sd=0, sv=0;
+  document.querySelectorAll('#entryGrid tr[data-mid]').forEach(function(tr){
+    var o = readRow(tr), v = rev(o);
+    tr.querySelector('[data-rev]').textContent = won(v);
+    sr+=o.recv; sd+=o.done; sv+=v;
+  });
+  if ($('#sRecv')){ $('#sRecv').textContent = fmt(sr); $('#sDone').textContent = fmt(sd); $('#sRev').textContent = won(sv); }
+}
+function saveEntry(){
+  var date = $('#eDate').value, cid = $('#eCust').value;
+  if (!date){ toast('일자를 선택하세요.'); return; }
+  if (!cid){ toast('고객사를 선택하세요.'); return; }
+  var changed = 0;
+  document.querySelectorAll('#entryGrid tr[data-mid]').forEach(function(tr){
+    var mid = tr.dataset.mid, o = readRow(tr);
+    var idx = DB.records.findIndex(function(x){ return x.date===date && x.mid===mid; });
+    var isEmpty = !o.recv && !o.done && !o.extra && !o.memo;
+    if (isEmpty){ if (idx>=0){ DB.records.splice(idx,1); changed++; } return; }
+    var rec = { id: idx>=0 ? DB.records[idx].id : uid(), date:date, cid:cid, mid:mid, recv:o.recv, done:o.done, price:o.price, extra:o.extra, memo:o.memo };
+    if (idx>=0) DB.records[idx] = rec; else DB.records.push(rec);
+    changed++;
+  });
+  if (!changed){ toast('저장할 내용이 없습니다.'); return; }
+  save(date + ' 실적을 저장했습니다.');
+}
+function renderRecList(){
+  custOptions($('#lCust'), true);
+  var mo = $('#lMonth').value, c = $('#lCust').value;
+  var rows = DB.records.filter(function(r){ return (!mo || r.date.slice(0,7)===mo) && (!c || r.cid===c); })
+    .sort(function(a,b){ return a.date<b.date ? 1 : a.date>b.date ? -1 : 0; });
+  if (!rows.length){ $('#recList').innerHTML = '<div class="empty">입력 내역이 없습니다.</div>'; return; }
+  var t = {recv:0,done:0,extra:0,money:0};
+  var h = '<table><thead><tr><th>일자</th><th>고객사</th><th>모델</th><th class="n">접수</th><th class="n">처리</th><th class="n">단가</th><th class="n">추가금액</th><th class="n">매출</th><th>메모</th><th></th></tr></thead><tbody>';
+  rows.forEach(function(r){
+    var md = model(r.mid), cc = cust(r.cid), v = rev(r);
+    t.recv+=num(r.recv); t.done+=num(r.done); t.extra+=num(r.extra); t.money+=v;
+    h += '<tr><td>'+r.date+'</td><td>'+esc(cc?cc.name:'(삭제됨)')+'</td><td>'+esc(md?md.name:'(삭제됨)')+'</td><td class="n">'+fmt(r.recv)+'</td><td class="n">'+fmt(r.done)+'</td><td class="n">'+fmt(r.price)+'</td><td class="n">'+fmt(r.extra)+'</td><td class="n">'+won(v)+'</td><td>'+esc(r.memo||'')+'</td>'+
+      '<td><button class="btn ghost sm" data-act="editRec" data-id="'+r.id+'">수정</button> <button class="btn danger sm" data-act="delRec" data-id="'+r.id+'">삭제</button></td></tr>';
+  });
+  h += '<tr class="sum"><td colspan="3">합계 ('+rows.length+'행)</td><td class="n">'+fmt(t.recv)+'</td><td class="n">'+fmt(t.done)+'</td><td></td><td class="n">'+fmt(t.extra)+'</td><td class="n">'+won(t.money)+'</td><td></td><td></td></tr></tbody></table>';
+  $('#recList').innerHTML = h;
+}
+
+// ---------- 고객사·모델 ----------
+function renderMaster(){
+  if (!DB.customers.length) $('#custList').innerHTML = '<div class="empty">등록된 고객사가 없습니다.</div>';
+  else {
+    var h = '<table><thead><tr><th>고객사</th><th>메모</th><th class="n">모델 수</th><th class="n">실적 행</th><th></th></tr></thead><tbody>';
+    DB.customers.forEach(function(c){
+      var nm = DB.models.filter(function(m){return m.cid===c.id;}).length;
+      var nr = DB.records.filter(function(r){return r.cid===c.id;}).length;
+      h += '<tr><td><input class="wide" data-act="custName" data-id="'+c.id+'" value="'+esc(c.name)+'"></td><td><input class="wide" data-act="custMemo" data-id="'+c.id+'" value="'+esc(c.memo||'')+'"></td><td class="n">'+nm+'</td><td class="n">'+nr+'</td><td><button class="btn danger sm" data-act="delCust" data-id="'+c.id+'">삭제</button></td></tr>';
+    });
+    $('#custList').innerHTML = h + '</tbody></table>';
+  }
+  custOptions($('#mCust'), false);
+  var cid = $('#mCust').value;
+  var ms = DB.models.filter(function(m){ return m.cid===cid; });
+  if (!cid) $('#modelList').innerHTML = '';
+  else if (!ms.length) $('#modelList').innerHTML = '<div class="empty">이 고객사에 등록된 모델이 없습니다.</div>';
+  else {
+    var h2 = '<table><thead><tr><th>제품군</th><th>모델명</th><th class="n">처리 단가(원)</th><th class="n">실적 행</th><th></th></tr></thead><tbody>';
+    ms.forEach(function(m){
+      var nr = DB.records.filter(function(r){return r.mid===m.id;}).length;
+      h2 += '<tr><td><input data-act="mProd" data-id="'+m.id+'" value="'+esc(m.product)+'"></td><td><input class="wide" data-act="mName" data-id="'+m.id+'" value="'+esc(m.name)+'"></td><td class="n"><input type="number" min="0" step="100" data-act="mPrice" data-id="'+m.id+'" value="'+num(m.price)+'"></td><td class="n">'+nr+'</td><td><button class="btn danger sm" data-act="delModel" data-id="'+m.id+'">삭제</button></td></tr>';
+    });
+    $('#modelList').innerHTML = h2 + '</tbody></table>';
+  }
+}
+function addCust(){
+  var name = $('#cName').value.trim();
+  if (!name){ toast('고객사명을 입력하세요.'); return; }
+  if (DB.customers.some(function(c){ return c.name===name; })){ toast('이미 등록된 고객사입니다.'); return; }
+  var c = { id:uid(), name:name, memo:$('#cMemo').value.trim() };
+  DB.customers.push(c);
+  $('#cName').value=''; $('#cMemo').value='';
+  $('#mCust').value = c.id;
+  save('고객사를 추가했습니다.');
+  $('#mCust').value = c.id; renderMaster();
+}
+function addModel(){
+  var cid = $('#mCust').value, name = $('#mName').value.trim();
+  if (!cid){ toast('고객사를 먼저 등록하세요.'); return; }
+  if (!name){ toast('모델명을 입력하세요.'); return; }
+  if (DB.models.some(function(m){ return m.cid===cid && m.name===name; })){ toast('이미 등록된 모델입니다.'); return; }
+  DB.models.push({ id:uid(), cid:cid, product:$('#mProd').value.trim(), name:name, price:num($('#mPrice').value) });
+  $('#mName').value=''; $('#mName').focus();
+  save('모델을 추가했습니다.');
+}
+
+// ---------- 데이터 ----------
+function download(name, text, type){
+  var blob = new Blob([text], {type:type});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+function downloadHtml(){
+  var json = JSON.stringify(DB).replace(/</g,'\\u003c');
+  var re = /(<script type="application\/json" id="embedded-data">)[\s\S]*?(<\/script>)/;
+  if (!re.test(ORIGINAL_HTML)){ toast('HTML 생성에 실패했습니다. JSON 백업을 이용하세요.'); return; }
+  var html = ORIGINAL_HTML.replace(re, function(_, a, b){ return a + json + b; });
+  var name = decodeURIComponent(location.pathname.split('/').pop() || '') || 'index.html';
+  if (!/\.html?$/i.test(name)) name = 'index.html';
+  download(name, html, 'text/html;charset=utf-8');
+  lsSet(LS_EXPORT, String(DB.savedAt));
+  renderStatus(); renderDataInfo();
+  toast(name + ' 을(를) 받았습니다. GitHub에 덮어써서 커밋하세요.');
+}
+function renderDataInfo(){
+  var emb = EMBEDDED ? new Date(EMBEDDED.savedAt).toLocaleString('ko-KR') : '없음';
+  $('#dataInfo').innerHTML =
+    '고객사 '+DB.customers.length+'곳 · 모델 '+DB.models.length+'개 · 실적 '+DB.records.length+'행<br>'+
+    'HTML 파일에 저장된 데이터 시점: '+emb+'<br>'+
+    '이 브라우저 최종 저장: '+(DB.savedAt ? new Date(DB.savedAt).toLocaleString('ko-KR') : '없음') +
+    (hasUnexported() ? '<br><b style="color:var(--warn)">GitHub에 아직 반영되지 않은 변경이 있습니다.</b>' : '');
+}
+
+// ---------- 전체 렌더 ----------
+function renderAll(){
+  renderFilters(); renderDashboard();
+  renderEntry(); renderRecList();
+  renderMaster(); renderDataInfo(); renderStatus();
+}
+
+// ---------- 이벤트 ----------
+function bind(){
+  $('#tabs').addEventListener('click', function(e){
+    var b = e.target.closest('button[data-tab]'); if (!b) return;
+    document.querySelectorAll('#tabs button').forEach(function(x){ x.classList.toggle('active', x===b); });
+    document.querySelectorAll('.tab').forEach(function(s){ s.classList.toggle('active', s.id==='tab-'+b.dataset.tab); });
+    if (b.dataset.tab==='dash') renderDashboard();
+  });
+  ['#fYear','#fMonth','#fCust'].forEach(function(s){ $(s).addEventListener('change', renderDashboard); });
+  $('#eDate').addEventListener('change', renderEntry);
+  $('#eCust').addEventListener('change', renderEntry);
+  $('#entryGrid').addEventListener('input', updateEntrySums);
+  $('#entryGrid').addEventListener('keydown', function(e){ if (e.key==='Enter'){ e.preventDefault(); saveEntry(); } });
+  $('#btnSaveEntry').addEventListener('click', saveEntry);
+  $('#lMonth').addEventListener('change', renderRecList);
+  $('#lCust').addEventListener('change', renderRecList);
+  $('#recList').addEventListener('click', function(e){
+    var b = e.target.closest('button[data-act]'); if (!b) return;
+    var r = DB.records.find(function(x){ return x.id===b.dataset.id; }); if (!r) return;
+    if (b.dataset.act==='delRec'){
+      if (confirm(r.date+' 실적을 삭제할까요?')){ DB.records = DB.records.filter(function(x){ return x.id!==r.id; }); save('삭제했습니다.'); }
+    } else {
+      $('#eDate').value = r.date; $('#eCust').value = r.cid; renderEntry();
+      window.scrollTo({top:0, behavior:'smooth'});
+    }
+  });
+  $('#btnAddCust').addEventListener('click', addCust);
+  $('#cName').addEventListener('keydown', function(e){ if (e.key==='Enter') addCust(); });
+  $('#btnAddModel').addEventListener('click', addModel);
+  $('#mName').addEventListener('keydown', function(e){ if (e.key==='Enter') addModel(); });
+  $('#mCust').addEventListener('change', renderMaster);
+  $('#tab-master').addEventListener('change', function(e){
+    var i = e.target, id = i.dataset.id, act = i.dataset.act; if (!act || !id) return;
+    if (act==='custName'){ var v=i.value.trim(); if(!v){ toast('고객사명은 비울 수 없습니다.'); renderMaster(); return; } cust(id).name=v; }
+    else if (act==='custMemo') cust(id).memo = i.value.trim();
+    else if (act==='mProd') model(id).product = i.value.trim();
+    else if (act==='mName'){ var w=i.value.trim(); if(!w){ toast('모델명은 비울 수 없습니다.'); renderMaster(); return; } model(id).name=w; }
+    else if (act==='mPrice') model(id).price = num(i.value);
+    else return;
+    save('수정했습니다.');
+  });
+  $('#tab-master').addEventListener('click', function(e){
+    var b = e.target.closest('button[data-act]'); if (!b) return;
+    var id = b.dataset.id;
+    if (b.dataset.act==='delCust'){
+      var c = cust(id), nr = DB.records.filter(function(r){return r.cid===id;}).length;
+      if (!confirm('"'+c.name+'" 고객사를 삭제할까요?' + (nr ? '\n이 고객사의 모델과 실적 '+nr+'행도 함께 삭제됩니다.' : ''))) return;
+      DB.customers = DB.customers.filter(function(x){return x.id!==id;});
+      DB.models = DB.models.filter(function(x){return x.cid!==id;});
+      DB.records = DB.records.filter(function(x){return x.cid!==id;});
+      save('고객사를 삭제했습니다.');
+    } else if (b.dataset.act==='delModel'){
+      var m = model(id), n2 = DB.records.filter(function(r){return r.mid===id;}).length;
+      if (!confirm('"'+m.name+'" 모델을 삭제할까요?' + (n2 ? '\n이 모델의 실적 '+n2+'행도 함께 삭제됩니다.' : ''))) return;
+      DB.models = DB.models.filter(function(x){return x.id!==id;});
+      DB.records = DB.records.filter(function(x){return x.mid!==id;});
+      save('모델을 삭제했습니다.');
+    }
+  });
+  $('#btnDlHtml').addEventListener('click', downloadHtml);
+  $('#btnDlJson').addEventListener('click', function(){
+    download('as_revenue_backup_'+today()+'.json', JSON.stringify(DB, null, 2), 'application/json');
+  });
+  $('#btnImport').addEventListener('click', function(){ $('#fileImport').click(); });
+  $('#fileImport').addEventListener('change', function(e){
+    var f = e.target.files[0]; if (!f) return;
+    var rd = new FileReader();
+    rd.onload = function(){
+      try {
+        var d = JSON.parse(rd.result);
+        if (!valid(d)) throw new Error();
+        if (!confirm('현재 데이터를 불러온 파일 내용으로 바꿀까요?\n(고객사 '+d.customers.length+' · 모델 '+d.models.length+' · 실적 '+d.records.length+'행)')) return;
+        DB = d; save('불러왔습니다.');
+      } catch(err){ toast('올바른 백업 파일이 아닙니다.'); }
+      e.target.value = '';
+    };
+    rd.readAsText(f, 'utf-8');
+  });
+  $('#btnRevert').addEventListener('click', function(){
+    if (!confirm('이 브라우저에서 입력한 변경분을 버리고 HTML 파일에 저장된 데이터로 되돌릴까요?')) return;
+    lsDel(LS_KEY); lsDel(LS_EXPORT);
+    DB = EMBEDDED ? JSON.parse(JSON.stringify(EMBEDDED)) : emptyDB();
+    renderAll(); toast('되돌렸습니다.');
+  });
+  $('#btnWipe').addEventListener('click', function(){
+    if (!confirm('고객사·모델·실적 전체를 삭제할까요? 되돌릴 수 없습니다.')) return;
+    DB = emptyDB(); save('전체 삭제했습니다.');
+  });
+  window.addEventListener('beforeunload', function(e){
+    if (hasUnexported() && (location.protocol==='file:')){ e.preventDefault(); e.returnValue=''; }
+  });
+}
+
+// ---------- 시작 ----------
+load();
+$('#eDate').value = today();
+$('#lMonth').value = today().slice(0,7);
+bind();
+renderAll();
+})();
+</script>
+</body>
+</html>
