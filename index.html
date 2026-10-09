@@ -58,14 +58,6 @@ td input.wide{width:160px}
 .note{background:#f7f9fb;border:1px solid var(--line);border-radius:8px;padding:12px 14px;line-height:1.7;font-size:13px}
 .note ol{margin:6px 0 0;padding-left:20px}
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1c2430;color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;display:none;z-index:20}
-.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
-.seg button{font:inherit;border:none;background:#fff;color:var(--sub);padding:6px 14px;cursor:pointer}
-.seg button+button{border-left:1px solid var(--line)}
-.seg button.on{background:var(--brand);color:#fff}
-tr.click{cursor:pointer}
-tr.click:hover td{background:var(--brand-soft)}
-tr.zero td{color:#b3bcc8}
-td.sat{color:var(--brand)} td.sun{color:var(--bad)}
 .badge{display:inline-block;padding:1px 7px;border-radius:999px;font-size:11px;background:var(--brand-soft);color:var(--brand)}
 @media (max-width:860px){.grid2{grid-template-columns:1fr} header{position:static}}
 </style>
@@ -100,14 +92,6 @@ td.sat{color:var(--brand)} td.sun{color:var(--bad)}
       <div class="box"><div class="muted" id="trendTitle">월별 접수·처리·매출</div><div class="chartwrap"><canvas id="chTrend"></canvas></div></div>
       <div class="box"><div class="muted" id="shareTitle">매출 비중</div><div class="chartwrap"><canvas id="chShare"></canvas></div></div>
     </div>
-    <div class="row" style="justify-content:space-between;margin-top:22px">
-      <h2 id="periodTitle" style="margin:0">월별 실적</h2>
-      <div class="seg" id="periodSeg">
-        <button data-view="month">월별</button><button data-view="day">일자별</button>
-      </div>
-    </div>
-    <p class="muted" id="periodHint" style="margin:6px 0 8px"></p>
-    <div class="tablewrap" id="tblPeriod"></div>
     <h2>고객사별 현황</h2>
     <div class="tablewrap" id="tblCust"></div>
     <h2>모델별 현황</h2>
@@ -282,19 +266,14 @@ function renderDashboard(){
     kpi('매출', won(money), '처리 1건당 ' + (done ? won(money/done) : '-')) +
     kpi('입력 일수', fmt(nDays)+'일', '일평균 매출 ' + (nDays ? won(money/nDays) : '-'));
 
-  // 추이: 월 선택 시 일자별, 아니면 월별
-  var daily = !!(y && m);
+  // 월별 추이
   var keys = [];
-  if (daily){ var last = new Date(Number(y), Number(m), 0).getDate(); for (var d=1; d<=last; d++) keys.push(y+'-'+m+'-'+(d<10?'0':'')+d); }
-  else if (y){ for (var i=1;i<=12;i++) keys.push(y+'-'+(i<10?'0':'')+i); }
+  if (y){ for (var i=1;i<=12;i++) keys.push(y+'-'+(i<10?'0':'')+i); }
   else { var s={}; inYC.forEach(function(r){ s[r.date.slice(0,7)]=1; }); keys = Object.keys(s).sort(); }
-  var klen = daily ? 10 : 7;
   var agg = {}; keys.forEach(function(k){ agg[k]={recv:0,done:0,money:0}; });
-  (daily ? rows : inYC).forEach(function(r){ var k=r.date.slice(0,klen); if(agg[k]){ agg[k].recv+=num(r.recv); agg[k].done+=num(r.done); agg[k].money+=rev(r); } });
-  var cname = c ? ' — ' + cust(c).name : '';
-  $('#trendTitle').textContent = daily ? (y+'년 '+Number(m)+'월 일자별 접수·처리·매출'+cname) : ((y ? y+'년 ' : '') + '월별 접수·처리·매출' + cname + ' · 막대를 누르면 일자별로 봅니다');
-  drawTrend(keys, agg, daily);
-  renderPeriodTable(keys, agg, daily);
+  inYC.forEach(function(r){ var k=r.date.slice(0,7); if(agg[k]){ agg[k].recv+=num(r.recv); agg[k].done+=num(r.done); agg[k].money+=rev(r); } });
+  $('#trendTitle').textContent = (y ? y+'년 ' : '') + '월별 접수·처리·매출' + (c ? ' — ' + cust(c).name : '');
+  drawTrend(keys, agg);
 
   // 비중 (고객사 선택 시 모델별)
   var share = {};
@@ -331,37 +310,12 @@ function renderDashboard(){
 }
 function kpi(l,v,s){ return '<div class="kpi"><div class="l">'+l+'</div><div class="v">'+v+'</div><div class="s">'+esc(s)+'</div></div>'; }
 function cssVar(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
-var WD = ['일','월','화','수','목','금','토'];
-function wday(k){ return new Date(Number(k.slice(0,4)), Number(k.slice(5,7))-1, Number(k.slice(8,10))).getDay(); }
-function drillMonth(k){
-  $('#fYear').value = k.slice(0,4); $('#fMonth').value = k.slice(5,7); renderDashboard();
-}
-function renderPeriodTable(keys, agg, daily){
-  var y = $('#fYear').value, m = $('#fMonth').value;
-  document.querySelectorAll('#periodSeg button').forEach(function(b){ b.classList.toggle('on', (b.dataset.view==='day')===daily); });
-  $('#periodTitle').textContent = daily ? (y+'년 '+Number(m)+'월 일자별 실적') : ((y ? y+'년 ' : '전체 기간 ') + '월별 실적');
-  $('#periodHint').textContent = daily ? '실적이 없는 날은 흐리게 표시됩니다.' : '행을 누르면 해당 월의 일자별 실적으로 이동합니다.';
-  if (!keys.length){ $('#tblPeriod').innerHTML = '<div class="empty">입력된 실적이 없습니다.</div>'; return; }
-  var t = {recv:0,done:0,money:0}, cum = 0;
-  var h = '<table><thead><tr><th>'+(daily?'일자':'월')+'</th>'+(daily?'<th>요일</th>':'')+'<th class="n">접수</th><th class="n">처리</th><th class="n">처리율</th><th class="n">미처리</th><th class="n">매출</th><th class="n">누적 매출</th></tr></thead><tbody>';
-  keys.forEach(function(k){
-    var o = agg[k]; cum += o.money; t.recv+=o.recv; t.done+=o.done; t.money+=o.money;
-    var empty = !o.recv && !o.done && !o.money;
-    var cls = (empty ? 'zero' : '') + (daily ? '' : ' click');
-    var label, wcell = '';
-    if (daily){ var w = wday(k); label = Number(k.slice(5,7))+'/'+Number(k.slice(8,10)); wcell = '<td class="'+(w===0?'sun':w===6?'sat':'')+'">'+WD[w]+'</td>'; }
-    else label = (y ? '' : k.slice(0,4)+'년 ') + Number(k.slice(5,7))+'월';
-    h += '<tr class="'+cls+'"'+(daily?'':' data-month="'+k+'"')+'><td>'+label+'</td>'+wcell+'<td class="n">'+fmt(o.recv)+'</td><td class="n">'+fmt(o.done)+'</td><td class="n">'+pct(o.done,o.recv)+'</td><td class="n">'+fmt(Math.max(o.recv-o.done,0))+'</td><td class="n">'+won(o.money)+'</td><td class="n">'+won(cum)+'</td></tr>';
-  });
-  h += '<tr class="sum"><td'+(daily?' colspan="2"':'')+'>합계</td><td class="n">'+fmt(t.recv)+'</td><td class="n">'+fmt(t.done)+'</td><td class="n">'+pct(t.done,t.recv)+'</td><td class="n">'+fmt(Math.max(t.recv-t.done,0))+'</td><td class="n">'+won(t.money)+'</td><td></td></tr></tbody></table>';
-  $('#tblPeriod').innerHTML = h;
-}
-function drawTrend(keys, agg, daily){
+function drawTrend(keys, agg){
   if (typeof Chart === 'undefined') return;
   if (charts.trend) charts.trend.destroy();
   charts.trend = new Chart($('#chTrend'), {
     data: {
-      labels: keys.map(function(k){ return daily ? Number(k.slice(8,10)) + '일' : Number(k.slice(5,7)) + '월' + (keys.length>12 || !$('#fYear').value ? ' ('+k.slice(2,4)+')' : ''); }),
+      labels: keys.map(function(k){ return Number(k.slice(5,7)) + '월' + (keys.length>12 || !$('#fYear').value ? ' ('+k.slice(2,4)+')' : ''); }),
       datasets: [
         { type:'bar', label:'접수', data:keys.map(function(k){return agg[k].recv;}), backgroundColor:cssVar('--c7'), yAxisID:'y' },
         { type:'bar', label:'처리', data:keys.map(function(k){return agg[k].done;}), backgroundColor:cssVar('--c1'), yAxisID:'y' },
@@ -371,11 +325,7 @@ function drawTrend(keys, agg, daily){
     options: {
       responsive:true, maintainAspectRatio:false, animation:false,
       interaction:{ mode:'index', intersect:false },
-      onClick:function(evt, els){ if (!daily && els && els.length) drillMonth(keys[els[0].index]); },
-      onHover:function(evt, els){ evt.native.target.style.cursor = (!daily && els && els.length) ? 'pointer' : 'default'; },
-      plugins:{ tooltip:{ callbacks:{
-        title:function(items){ var k = keys[items[0].dataIndex]; return daily ? (Number(k.slice(5,7))+'월 '+Number(k.slice(8,10))+'일 ('+WD[wday(k)]+')') : items[0].label; },
-        label:function(ctx){ return ctx.dataset.label + ': ' + (ctx.dataset.yAxisID==='y1' ? won(ctx.raw) : fmt(ctx.raw)+'건'); } } } },
+      plugins:{ tooltip:{ callbacks:{ label:function(ctx){ return ctx.dataset.label + ': ' + (ctx.dataset.yAxisID==='y1' ? won(ctx.raw) : fmt(ctx.raw)+'건'); } } } },
       scales:{
         y:{ beginAtZero:true, title:{display:true,text:'건수'} },
         y1:{ beginAtZero:true, position:'right', grid:{drawOnChartArea:false}, title:{display:true,text:'매출(원)'}, ticks:{ callback:function(v){ return v>=10000 ? fmt(v/10000)+'만' : fmt(v); } } }
@@ -558,18 +508,6 @@ function bind(){
     if (b.dataset.tab==='dash') renderDashboard();
   });
   ['#fYear','#fMonth','#fCust'].forEach(function(s){ $(s).addEventListener('change', renderDashboard); });
-  $('#periodSeg').addEventListener('click', function(e){
-    var b = e.target.closest('button[data-view]'); if (!b) return;
-    if (b.dataset.view==='month'){ $('#fMonth').value = ''; renderDashboard(); return; }
-    if ($('#fYear').value && $('#fMonth').value) return;
-    var y = $('#fYear').value || today().slice(0,4), mo;
-    if (y === today().slice(0,4)) mo = today().slice(5,7);
-    else { var ds = DB.records.filter(function(r){ return r.date.slice(0,4)===y; }).map(function(r){ return r.date; }).sort(); mo = ds.length ? ds[ds.length-1].slice(5,7) : '01'; }
-    drillMonth(y+'-'+mo);
-  });
-  $('#tblPeriod').addEventListener('click', function(e){
-    var tr = e.target.closest('tr[data-month]'); if (tr) drillMonth(tr.dataset.month);
-  });
   $('#eDate').addEventListener('change', renderEntry);
   $('#eCust').addEventListener('change', renderEntry);
   $('#entryGrid').addEventListener('input', updateEntrySums);
