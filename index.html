@@ -1,11 +1,15 @@
 <!DOCTYPE html>
-<html lang="ko"><script src="chrome-extension://dheimbmpmkbepjjcobigjacfepohombn/contentscript.js"></script><head>
+<html lang="ko">
+<head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AS 실적·매출 관리</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&amp;family=JetBrains+Mono:wght@400;600&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
 :root{
   /* J2L FLOW 지식베이스와 동일한 팔레트 */
@@ -88,6 +92,21 @@ tbody tr.click:hover td{background:var(--accent-glow);color:var(--text)}
 tr.zero td,tr.zero td.n{color:var(--text3)}
 td.sat{color:#7d9dff} td.sun{color:var(--danger)}
 #dataInfo b{color:var(--warning)!important}
+body.cloud .local-only{display:none!important}
+body:not(.cloud) .cloud-only{display:none!important}
+.status.live{color:var(--success);border-color:rgba(61,214,140,.4);background:rgba(61,214,140,.08)}
+.hright{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.userbox{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text2)}
+.gate{position:fixed;inset:0;z-index:300;background:var(--bg);display:none;align-items:center;justify-content:center;padding:16px}
+.gate.show{display:flex}
+.gate-card{width:100%;max-width:400px;background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:32px 28px;text-align:center}
+.gate-card .logo{font-family:'JetBrains Mono',monospace;color:var(--accent);font-weight:600;font-size:20px}
+.gate-card .logo span{color:var(--text2);font-weight:400}
+.gate-card h3{margin:8px 0 6px;font-size:16px;color:var(--text)}
+.gate-card p{margin:0 0 20px;font-size:13px;color:var(--text2);line-height:1.7;word-break:keep-all}
+.gate-card p.err{color:var(--danger)}
+.gate-card .btn{width:100%;padding:11px}
+.gate-card .btn+.btn{margin-top:8px}
 .badge{display:inline-block;padding:1px 7px;border-radius:5px;font-size:10px;background:var(--accent-glow);color:var(--accent)}
 @media (max-width:860px){.grid2{grid-template-columns:1fr} header{position:static} main,nav{padding-left:16px;padding-right:16px}}
 </style>
@@ -95,12 +114,25 @@ td.sat{color:#7d9dff} td.sun{color:var(--danger)}
 <body>
 
 <!-- 저장된 데이터 (HTML 다운로드 시 이 부분이 자동으로 갱신됩니다) -->
-<script type="application/json" id="embedded-data">{"version":1,"savedAt":1791514855015,"customers":[{"id":"mv0bhqw77v7r8","name":"앳홈","memo":"유무상건별 지급"},{"id":"mv0bi2lwke2z8","name":"샤오미","memo":"유무상 건별 지급"},{"id":"mv0bi9gfx5ff2","name":"인스타360","memo":"유무상건별 지급"},{"id":"mv0bicz3j0dee","name":"동서식품","memo":"유무상건별 지급"},{"id":"mv0biqh6l99f5","name":"일리커피머신","memo":"유무상건별 지급"}],"models":[{"id":"mv0bjakkrgv07","cid":"mv0bhqw77v7r8","product":"로봇청소기","name":"T24-BK","price":19000},{"id":"mv0bjh7xy8wbq","cid":"mv0bhqw77v7r8","product":"로봇청소기","name":"T24-WH","price":19000},{"id":"mv0bjw5njlzym","cid":"mv0bhqw77v7r8","product":"진공블랜더","name":"KCBL100-BK","price":18000},{"id":"mv0bk2oslwa2h","cid":"mv0bhqw77v7r8","product":"진공블랜더","name":"KCBL100-WH","price":18000},{"id":"mv0bkcbnu4eet","cid":"mv0bhqw77v7r8","product":"진공블랜더","name":"KCAF100-WH","price":17000},{"id":"mv0bkie0dmiuo","cid":"mv0bhqw77v7r8","product":"진공블랜더","name":"KCAF100-BK","price":17000},{"id":"mv0bktl54skgm","cid":"mv0bhqw77v7r8","product":"로봇청소기","name":"R6","price":19000},{"id":"mv0bovvrp1s47","cid":"mv0bi2lwke2z8","product":"로봇청소기","name":"로봇청소기(L0~L1)","price":19000},{"id":"mv0bp5ery0b44","cid":"mv0bi2lwke2z8","product":"로봇청소기","name":"로봇청소기(L2)","price":24000},{"id":"mv0bpudnhz82f","cid":"mv0bi2lwke2z8","product":"스마트기기","name":"스마트기기 교환반품","price":12000},{"id":"mv0bqa3mwprk2","cid":"mv0bi2lwke2z8","product":"로봇청소기","name":"로봇청소기 교환반품","price":19000},{"id":"mv0br6vcrhov8","cid":"mv0bi9gfx5ff2","product":"액션캠","name":"액션캠 AS","price":13000},{"id":"mv0brl4vwep68","cid":"mv0bi9gfx5ff2","product":"액션캠","name":"액션캠 반품(본체)","price":1200},{"id":"mv0brtxegzhjq","cid":"mv0bi9gfx5ff2","product":"액션캠","name":"액션캠 반품(악세서리)","price":1000},{"id":"mv0bs18rd60cg","cid":"mv0bi9gfx5ff2","product":"액션캠","name":"액션캠 반품(빈포장)","price":600},{"id":"mv0d12bo4fj4t","cid":"mv0bhqw77v7r8","product":"로봇청소기","name":"T24-BE","price":19000},{"id":"mv0d16trm138f","cid":"mv0bhqw77v7r8","product":"로봇청소기","name":"T24P-WH","price":19000}],"records":[{"id":"mv0c12zuulm89","date":"2026-10-01","cid":"mv0bi2lwke2z8","mid":"mv0bovvrp1s47","recv":0,"done":2,"price":19000,"extra":0,"memo":""},{"id":"mv0c1irom2pfw","date":"2026-10-02","cid":"mv0bhqw77v7r8","mid":"mv0bjw5njlzym","recv":0,"done":2,"price":18000,"extra":0,"memo":""},{"id":"mv0c1irofw17y","date":"2026-10-02","cid":"mv0bhqw77v7r8","mid":"mv0bk2oslwa2h","recv":0,"done":3,"price":18000,"extra":0,"memo":""},{"id":"mv0c1sucljyxn","date":"2026-10-02","cid":"mv0bi2lwke2z8","mid":"mv0bovvrp1s47","recv":0,"done":1,"price":19000,"extra":0,"memo":""},{"id":"mv0c1suc7d1ne","date":"2026-10-02","cid":"mv0bi2lwke2z8","mid":"mv0bp5ery0b44","recv":0,"done":11,"price":24000,"extra":0,"memo":""},{"id":"mv0c36hbp3wa3","date":"2026-10-01","cid":"mv0bhqw77v7r8","mid":"mv0bk2oslwa2h","recv":0,"done":1,"price":18000,"extra":0,"memo":""},{"id":"mv0c36hbydz6y","date":"2026-10-01","cid":"mv0bhqw77v7r8","mid":"mv0bkie0dmiuo","recv":0,"done":1,"price":17000,"extra":0,"memo":""},{"id":"mv0c3xp9k0l0p","date":"2026-10-02","cid":"mv0bhqw77v7r8","mid":"mv0bkie0dmiuo","recv":0,"done":1,"price":17000,"extra":0,"memo":""},{"id":"mv0c4xrwxben8","date":"2026-10-03","cid":"mv0bhqw77v7r8","mid":"mv0bjakkrgv07","recv":0,"done":1,"price":19000,"extra":0,"memo":""},{"id":"mv0c4xrwe8ztm","date":"2026-10-03","cid":"mv0bhqw77v7r8","mid":"mv0bkcbnu4eet","recv":0,"done":1,"price":17000,"extra":0,"memo":""},{"id":"mv0c4xrw4it1q","date":"2026-10-03","cid":"mv0bhqw77v7r8","mid":"mv0bkie0dmiuo","recv":0,"done":4,"price":17000,"extra":0,"memo":""},{"id":"mv0c50zenkk6i","date":"2026-10-03","cid":"mv0bi2lwke2z8","mid":"mv0bovvrp1s47","recv":0,"done":1,"price":19000,"extra":0,"memo":""},{"id":"mv0c5blvbxhjg","date":"2026-10-06","cid":"mv0bi2lwke2z8","mid":"mv0bovvrp1s47","recv":0,"done":4,"price":19000,"extra":0,"memo":""},{"id":"mv0c5uuwhuce5","date":"2026-10-06","cid":"mv0bhqw77v7r8","mid":"mv0bjh7xy8wbq","recv":0,"done":2,"price":19000,"extra":0,"memo":""},{"id":"mv0c5uuwgrqv2","date":"2026-10-06","cid":"mv0bhqw77v7r8","mid":"mv0bjw5njlzym","recv":0,"done":1,"price":18000,"extra":0,"memo":""},{"id":"mv0c5uuw78dqk","date":"2026-10-06","cid":"mv0bhqw77v7r8","mid":"mv0bk2oslwa2h","recv":0,"done":2,"price":18000,"extra":0,"memo":""},{"id":"mv0c5uuw27u5p","date":"2026-10-06","cid":"mv0bhqw77v7r8","mid":"mv0bkcbnu4eet","recv":0,"done":2,"price":17000,"extra":0,"memo":""},{"id":"mv0c64kszq8m3","date":"2026-10-06","cid":"mv0bhqw77v7r8","mid":"mv0bkie0dmiuo","recv":0,"done":1,"price":17000,"extra":0,"memo":""},{"id":"mv0c6vqiyl479","date":"2026-10-07","cid":"mv0bhqw77v7r8","mid":"mv0bjh7xy8wbq","recv":0,"done":1,"price":19000,"extra":0,"memo":""},{"id":"mv0c6vqi2mtyu","date":"2026-10-07","cid":"mv0bhqw77v7r8","mid":"mv0bk2oslwa2h","recv":0,"done":1,"price":18000,"extra":0,"memo":""},{"id":"mv0c6vqicmp19","date":"2026-10-07","cid":"mv0bhqw77v7r8","mid":"mv0bkie0dmiuo","recv":0,"done":1,"price":17000,"extra":0,"memo":""},{"id":"mv0c6yziwcuxp","date":"2026-10-07","cid":"mv0bi2lwke2z8","mid":"mv0bovvrp1s47","recv":0,"done":3,"price":19000,"extra":0,"memo":""},{"id":"mv0c7c524gci4","date":"2026-10-08","cid":"mv0bi2lwke2z8","mid":"mv0bovvrp1s47","recv":0,"done":4,"price":19000,"extra":0,"memo":""},{"id":"mv0c81609thyo","date":"2026-10-08","cid":"mv0bhqw77v7r8","mid":"mv0bjh7xy8wbq","recv":0,"done":2,"price":19000,"extra":0,"memo":""},{"id":"mv0c8160y26ig","date":"2026-10-08","cid":"mv0bhqw77v7r8","mid":"mv0bjw5njlzym","recv":0,"done":1,"price":18000,"extra":0,"memo":""},{"id":"mv0c8160gd84m","date":"2026-10-08","cid":"mv0bhqw77v7r8","mid":"mv0bkcbnu4eet","recv":0,"done":2,"price":17000,"extra":0,"memo":""},{"id":"mv0c81602bjf1","date":"2026-10-08","cid":"mv0bhqw77v7r8","mid":"mv0bkie0dmiuo","recv":0,"done":1,"price":17000,"extra":0,"memo":""},{"id":"mv0cznbykbant","date":"2026-09-01","cid":"mv0bhqw77v7r8","mid":"mv0bk2oslwa2h","recv":0,"done":1,"price":18000,"extra":0,"memo":""},{"id":"mv0czv8f11az0","date":"2026-09-02","cid":"mv0bhqw77v7r8","mid":"mv0bjh7xy8wbq","recv":0,"done":2,"price":19000,"extra":0,"memo":""},{"id":"mv0d1pu4sqjxa","date":"2026-09-03","cid":"mv0bhqw77v7r8","mid":"mv0bk2oslwa2h","recv":0,"done":1,"price":18000,"extra":0,"memo":""},{"id":"mv0d1zfsxl3w5","date":"2026-09-07","cid":"mv0bhqw77v7r8","mid":"mv0bjh7xy8wbq","recv":0,"done":3,"price":19000,"extra":0,"memo":""},{"id":"mv0d2jbmd2dj2","date":"2026-09-08","cid":"mv0bhqw77v7r8","mid":"mv0bjh7xy8wbq","recv":0,"done":2,"price":19000,"extra":0,"memo":""},{"id":"mv0d2jbn57y9m","date":"2026-09-08","cid":"mv0bhqw77v7r8","mid":"mv0d16trm138f","recv":0,"done":1,"price":19000,"extra":0,"memo":""},{"id":"mv0d2r6oacf4f","date":"2026-09-10","cid":"mv0bhqw77v7r8","mid":"mv0bjh7xy8wbq","recv":0,"done":2,"price":19000,"extra":0,"memo":""},{"id":"mv0d3tl9n285e","date":"2026-09-14","cid":"mv0bhqw77v7r8","mid":"mv0bjakkrgv07","recv":0,"done":1,"price":19000,"extra":0,"memo":""},{"id":"mv0d3tl9dvl8u","date":"2026-09-14","cid":"mv0bhqw77v7r8","mid":"mv0bjh7xy8wbq","recv":0,"done":8,"price":19000,"extra":0,"memo":""},{"id":"mv0d3tl9c7k18","date":"2026-09-14","cid":"mv0bhqw77v7r8","mid":"mv0bjw5njlzym","recv":0,"done":6,"price":18000,"extra":0,"memo":""},{"id":"mv0d3tl91kyhy","date":"2026-09-14","cid":"mv0bhqw77v7r8","mid":"mv0bk2oslwa2h","recv":0,"done":15,"price":18000,"extra":0,"memo":""},{"id":"mv0d3tl91f4gp","date":"2026-09-14","cid":"mv0bhqw77v7r8","mid":"mv0d12bo4fj4t","recv":0,"done":1,"price":19000,"extra":0,"memo":""},{"id":"mv0d4e59g79c9","date":"2026-09-15","cid":"mv0bhqw77v7r8","mid":"mv0bjh7xy8wbq","recv":0,"done":3,"price":19000,"extra":0,"memo":""},{"id":"mv0d4kexk1edj","date":"2026-09-16","cid":"mv0bhqw77v7r8","mid":"mv0bjh7xy8wbq","recv":0,"done":9,"price":19000,"extra":0,"memo":""},{"id":"mv0d4w5t7e4ko","date":"2026-09-17","cid":"mv0bhqw77v7r8","mid":"mv0bjakkrgv07","recv":0,"done":1,"price":19000,"extra":0,"memo":""},{"id":"mv0d4w5twm9wx","date":"2026-09-17","cid":"mv0bhqw77v7r8","mid":"mv0bjh7xy8wbq","recv":0,"done":5,"price":19000,"extra":0,"memo":""},{"id":"mv0d4w5te2odv","date":"2026-09-17","cid":"mv0bhqw77v7r8","mid":"mv0bjw5njlzym","recv":0,"done":1,"price":18000,"extra":0,"memo":""},{"id":"mv0d4w5t6nrzp","date":"2026-09-17","cid":"mv0bhqw77v7r8","mid":"mv0bk2oslwa2h","recv":0,"done":1,"price":18000,"extra":0,"memo":""},{"id":"mv0d5snhq7att","date":"2026-09-18","cid":"mv0bhqw77v7r8","mid":"mv0bjh7xy8wbq","recv":0,"done":33,"price":19000,"extra":0,"memo":""},{"id":"mv0d5snhfn3j6","date":"2026-09-18","cid":"mv0bhqw77v7r8","mid":"mv0bjw5njlzym","recv":0,"done":4,"price":18000,"extra":0,"memo":""},{"id":"mv0d5snh0cub9","date":"2026-09-18","cid":"mv0bhqw77v7r8","mid":"mv0bk2oslwa2h","recv":0,"done":10,"price":18000,"extra":0,"memo":""},{"id":"mv0d5snh6bj65","date":"2026-09-18","cid":"mv0bhqw77v7r8","mid":"mv0bkie0dmiuo","recv":0,"done":1,"price":17000,"extra":0,"memo":""},{"id":"mv0d5snhobyw8","date":"2026-09-18","cid":"mv0bhqw77v7r8","mid":"mv0d16trm138f","recv":0,"done":2,"price":19000,"extra":0,"memo":""},{"id":"mv0d68llkrp4a","date":"2026-09-21","cid":"mv0bhqw77v7r8","mid":"mv0bjh7xy8wbq","recv":0,"done":5,"price":19000,"extra":0,"memo":""},{"id":"mv0d68llxkw5p","date":"2026-09-21","cid":"mv0bhqw77v7r8","mid":"mv0bjw5njlzym","recv":0,"done":1,"price":18000,"extra":0,"memo":""},{"id":"mv0d68ll05jy4","date":"2026-09-21","cid":"mv0bhqw77v7r8","mid":"mv0bk2oslwa2h","recv":0,"done":2,"price":18000,"extra":0,"memo":""},{"id":"mv0d79owynn01","date":"2026-09-22","cid":"mv0bhqw77v7r8","mid":"mv0bjh7xy8wbq","recv":0,"done":9,"price":19000,"extra":0,"memo":""},{"id":"mv0d79owxoxjl","date":"2026-09-22","cid":"mv0bhqw77v7r8","mid":"mv0bjw5njlzym","recv":0,"done":3,"price":18000,"extra":0,"memo":""},{"id":"mv0d79owm9vop","date":"2026-09-22","cid":"mv0bhqw77v7r8","mid":"mv0d16trm138f","recv":0,"done":2,"price":19000,"extra":0,"memo":""},{"id":"mv0d7szzug2sd","date":"2026-09-23","cid":"mv0bhqw77v7r8","mid":"mv0bjakkrgv07","recv":0,"done":1,"price":19000,"extra":0,"memo":""},{"id":"mv0d7szza8kcr","date":"2026-09-23","cid":"mv0bhqw77v7r8","mid":"mv0bjh7xy8wbq","recv":0,"done":8,"price":19000,"extra":0,"memo":""},{"id":"mv0d7szzqzyz2","date":"2026-09-23","cid":"mv0bhqw77v7r8","mid":"mv0bk2oslwa2h","recv":0,"done":1,"price":18000,"extra":0,"memo":""},{"id":"mv0d7szztjnj9","date":"2026-09-23","cid":"mv0bhqw77v7r8","mid":"mv0d16trm138f","recv":0,"done":1,"price":19000,"extra":0,"memo":""},{"id":"mv0d8jisk8ni2","date":"2026-09-26","cid":"mv0bhqw77v7r8","mid":"mv0bk2oslwa2h","recv":0,"done":1,"price":18000,"extra":0,"memo":""},{"id":"mv0d936c85vmt","date":"2026-09-28","cid":"mv0bhqw77v7r8","mid":"mv0bjh7xy8wbq","recv":0,"done":12,"price":19000,"extra":0,"memo":""},{"id":"mv0d936crwtjl","date":"2026-09-28","cid":"mv0bhqw77v7r8","mid":"mv0bjw5njlzym","recv":0,"done":1,"price":18000,"extra":0,"memo":""},{"id":"mv0d936cptp4n","date":"2026-09-28","cid":"mv0bhqw77v7r8","mid":"mv0bk2oslwa2h","recv":0,"done":6,"price":18000,"extra":0,"memo":""},{"id":"mv0d936cxca1q","date":"2026-09-28","cid":"mv0bhqw77v7r8","mid":"mv0bkcbnu4eet","recv":0,"done":2,"price":17000,"extra":0,"memo":""},{"id":"mv0d936ctwpu2","date":"2026-09-28","cid":"mv0bhqw77v7r8","mid":"mv0bkie0dmiuo","recv":0,"done":5,"price":17000,"extra":0,"memo":""},{"id":"mv0d936c8iz89","date":"2026-09-28","cid":"mv0bhqw77v7r8","mid":"mv0d16trm138f","recv":0,"done":2,"price":19000,"extra":0,"memo":""},{"id":"mv0dbh9tcto97","date":"2026-09-29","cid":"mv0bhqw77v7r8","mid":"mv0bjh7xy8wbq","recv":0,"done":8,"price":19000,"extra":0,"memo":""},{"id":"mv0dbh9te5d55","date":"2026-09-29","cid":"mv0bhqw77v7r8","mid":"mv0bjw5njlzym","recv":0,"done":1,"price":18000,"extra":0,"memo":""},{"id":"mv0dbh9t8wapm","date":"2026-09-29","cid":"mv0bhqw77v7r8","mid":"mv0bk2oslwa2h","recv":0,"done":2,"price":18000,"extra":0,"memo":""},{"id":"mv0dbtvne5n5t","date":"2026-09-30","cid":"mv0bhqw77v7r8","mid":"mv0bjh7xy8wbq","recv":0,"done":4,"price":19000,"extra":0,"memo":""},{"id":"mv0dbtvn8yrpd","date":"2026-09-30","cid":"mv0bhqw77v7r8","mid":"mv0bjw5njlzym","recv":0,"done":1,"price":18000,"extra":0,"memo":""},{"id":"mv0dbtvn4fjvj","date":"2026-09-30","cid":"mv0bhqw77v7r8","mid":"mv0bk2oslwa2h","recv":0,"done":2,"price":18000,"extra":0,"memo":""},{"id":"mv0dbtvnqupe9","date":"2026-09-30","cid":"mv0bhqw77v7r8","mid":"mv0d16trm138f","recv":0,"done":2,"price":19000,"extra":0,"memo":""},{"id":"mv0dfih3j53of","date":"2026-09-01","cid":"mv0bi2lwke2z8","mid":"mv0bpudnhz82f","recv":0,"done":1,"price":12000,"extra":0,"memo":""},{"id":"mv0dfsv7plm5b","date":"2026-09-11","cid":"mv0bi2lwke2z8","mid":"mv0bpudnhz82f","recv":0,"done":3,"price":12000,"extra":0,"memo":""},{"id":"mv0dg1n8zibpn","date":"2026-09-14","cid":"mv0bi2lwke2z8","mid":"mv0bpudnhz82f","recv":0,"done":4,"price":12000,"extra":0,"memo":""},{"id":"mv0dg5pcib29x","date":"2026-09-15","cid":"mv0bi2lwke2z8","mid":"mv0bpudnhz82f","recv":0,"done":2,"price":12000,"extra":0,"memo":""},{"id":"mv0dgb724f7th","date":"2026-09-16","cid":"mv0bi2lwke2z8","mid":"mv0bpudnhz82f","recv":0,"done":6,"price":12000,"extra":0,"memo":""},{"id":"mv0dgeumclf0j","date":"2026-09-17","cid":"mv0bi2lwke2z8","mid":"mv0bpudnhz82f","recv":0,"done":1,"price":12000,"extra":0,"memo":""},{"id":"mv0dgjq636mva","date":"2026-09-19","cid":"mv0bi2lwke2z8","mid":"mv0bpudnhz82f","recv":0,"done":2,"price":12000,"extra":0,"memo":""},{"id":"mv0dgpvjldpk5","date":"2026-09-21","cid":"mv0bi2lwke2z8","mid":"mv0bpudnhz82f","recv":0,"done":1,"price":12000,"extra":0,"memo":""},{"id":"mv0dgv3z73tit","date":"2026-09-22","cid":"mv0bi2lwke2z8","mid":"mv0bpudnhz82f","recv":0,"done":3,"price":12000,"extra":0,"memo":""},{"id":"mv0dgzxqs7xub","date":"2026-09-23","cid":"mv0bi2lwke2z8","mid":"mv0bpudnhz82f","recv":0,"done":1,"price":12000,"extra":0,"memo":""},{"id":"mv0dhjj4p8l1h","date":"2026-09-26","cid":"mv0bi2lwke2z8","mid":"mv0bp5ery0b44","recv":0,"done":2,"price":24000,"extra":0,"memo":""},{"id":"mv0dhtug23wn4","date":"2026-09-29","cid":"mv0bi2lwke2z8","mid":"mv0bpudnhz82f","recv":0,"done":1,"price":12000,"extra":0,"memo":""},{"id":"mv0dhzc5cdfzh","date":"2026-09-30","cid":"mv0bi2lwke2z8","mid":"mv0bp5ery0b44","recv":0,"done":2,"price":24000,"extra":0,"memo":""},{"id":"mv0dklvieae1u","date":"2026-08-11","cid":"mv0bhqw77v7r8","mid":"mv0bk2oslwa2h","recv":0,"done":1,"price":18000,"extra":0,"memo":""},{"id":"mv0dl99kiuoc4","date":"2026-08-13","cid":"mv0bhqw77v7r8","mid":"mv0bjw5njlzym","recv":0,"done":1,"price":18000,"extra":0,"memo":""},{"id":"mv0dl99ku1jwv","date":"2026-08-13","cid":"mv0bhqw77v7r8","mid":"mv0bk2oslwa2h","recv":0,"done":1,"price":18000,"extra":0,"memo":""},{"id":"mv0dllpas8g53","date":"2026-08-12","cid":"mv0bhqw77v7r8","mid":"mv0bk2oslwa2h","recv":0,"done":1,"price":18000,"extra":0,"memo":""},{"id":"mv0dmootb67wv","date":"2026-08-18","cid":"mv0bhqw77v7r8","mid":"mv0bjh7xy8wbq","recv":0,"done":1,"price":19000,"extra":0,"memo":""},{"id":"mv0dmus6utpa0","date":"2026-08-21","cid":"mv0bhqw77v7r8","mid":"mv0bjh7xy8wbq","recv":0,"done":1,"price":19000,"extra":0,"memo":""},{"id":"mv0dn20xv01r5","date":"2026-08-22","cid":"mv0bhqw77v7r8","mid":"mv0bjw5njlzym","recv":0,"done":1,"price":18000,"extra":0,"memo":""},{"id":"mv0dnc1244j1m","date":"2026-08-29","cid":"mv0bhqw77v7r8","mid":"mv0bjw5njlzym","recv":0,"done":1,"price":18000,"extra":0,"memo":""},{"id":"mv0dnc1232bub","date":"2026-08-29","cid":"mv0bhqw77v7r8","mid":"mv0bkie0dmiuo","recv":0,"done":1,"price":17000,"extra":0,"memo":""},{"id":"mv0dnl0ai74mr","date":"2026-08-30","cid":"mv0bhqw77v7r8","mid":"mv0bjh7xy8wbq","recv":0,"done":1,"price":19000,"extra":0,"memo":""},{"id":"mv0dnl0a7l3z9","date":"2026-08-30","cid":"mv0bhqw77v7r8","mid":"mv0bk2oslwa2h","recv":0,"done":1,"price":18000,"extra":0,"memo":""},{"id":"mv0dnpl64kz94","date":"2026-08-31","cid":"mv0bhqw77v7r8","mid":"mv0bk2oslwa2h","recv":0,"done":1,"price":18000,"extra":0,"memo":""}]}</script>
+<script type="application/json" id="embedded-data">null</script>
 
 <header>
   <h1><span class="logo">J2L<span>FLOW</span></span>AS 실적·매출 관리</h1>
-  <span class="status" id="saveStatus">-</span>
+  <div class="hright">
+    <span class="status" id="saveStatus">-</span>
+    <span class="userbox cloud-only" id="userBox"><span id="userEmail"></span><button class="btn ghost sm" id="btnLogout">로그아웃</button></span>
+  </div>
 </header>
+
+<div class="gate" id="gate">
+  <div class="gate-card">
+    <div class="logo">J2L<span>FLOW</span></div>
+    <h3>AS 실적·매출 관리</h3>
+    <p id="gateMsg">등록된 Google 계정으로 로그인하세요.</p>
+    <button class="btn" id="btnLogin">Google 계정으로 로그인</button>
+    <button class="btn ghost" id="btnLogin2" style="display:none">다른 계정으로 로그인</button>
+  </div>
+</div>
 
 <nav id="tabs">
   <button data-tab="dash" class="active">대시보드</button>
@@ -180,7 +212,14 @@ td.sat{color:#7d9dff} td.sun{color:var(--danger)}
   <!-- 데이터 저장 -->
   <section class="tab" id="tab-data">
     <h2>저장 방식</h2>
-    <div class="note">
+    <div class="note cloud-only">
+      이 페이지는 <b>Firebase에 연결된 실시간 공유 모드</b>입니다. 입력하면 바로 저장되고, 이 주소를 열어둔 다른 사람 화면에도 즉시 반영됩니다. GitHub에 파일을 다시 올릴 필요가 없습니다.
+      <ol>
+        <li>처음 연결했다면 <b>기존 데이터 업로드</b>로 이 브라우저에 저장돼 있던 데이터를 Firebase로 옮기세요.</li>
+        <li>가끔 <b>JSON 백업</b>을 받아 두면 안전합니다.</li>
+      </ol>
+    </div>
+    <div class="note local-only">
       입력한 내용은 이 브라우저에 자동 저장됩니다. 다른 사람이나 다른 PC에서도 같은 데이터를 보려면 GitHub의 파일을 바꿔야 합니다.
       <ol>
         <li><b>데이터 포함 HTML 다운로드</b>를 누릅니다. 현재 데이터가 들어간 HTML 파일이 받아집니다.</li>
@@ -189,21 +228,38 @@ td.sat{color:#7d9dff} td.sun{color:var(--danger)}
       </ol>
     </div>
     <div class="row" style="margin-top:14px">
-      <button class="btn" id="btnDlHtml">데이터 포함 HTML 다운로드</button>
+      <button class="btn local-only" id="btnDlHtml">데이터 포함 HTML 다운로드</button>
       <button class="btn ghost" id="btnDlJson">JSON 백업</button>
       <button class="btn ghost" id="btnImport">JSON 불러오기</button>
+      <button class="btn cloud-only" id="btnMigrate">기존 데이터 업로드</button>
       <input type="file" id="fileImport" accept=".json,application/json" style="display:none">
     </div>
     <div id="dataInfo" class="muted" style="margin-top:12px;line-height:1.8"></div>
     <h2>초기화</h2>
     <div class="row">
-      <button class="btn danger" id="btnRevert">이 브라우저 변경분 버리기 (HTML에 저장된 데이터로 복귀)</button>
+      <button class="btn danger local-only" id="btnRevert">이 브라우저 변경분 버리기 (HTML에 저장된 데이터로 복귀)</button>
       <button class="btn danger" id="btnWipe">전체 데이터 삭제</button>
     </div>
   </section>
 </main>
 
 <div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   Firebase 설정 — Firebase 콘솔의 firebaseConfig 값을 붙여넣으세요.
+   apiKey가 비어 있으면 기존처럼 "브라우저 저장" 모드로 동작합니다.
+   (이 값은 공개돼도 괜찮습니다. 접근 권한은 Firestore 보안 규칙으로 막습니다.)
+   ============================================================ */
+var FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBs2TFK4vG57NSZuC0OgnkVRJ4LdQ7EIGQ",
+  authDomain: "j2lflow-repairservice.firebaseapp.com",
+  projectId: "j2lflow-repairservice",
+  storageBucket: "j2lflow-repairservice.firebasestorage.app",
+  messagingSenderId: "191581748643",
+  appId: "1:191581748643:web:ac1101ba8163d9558cee16"
+};
+</script>
 
 <script>
 // 최초 상태의 HTML (렌더링 전) — "데이터 포함 HTML 다운로드"에 사용
@@ -244,19 +300,162 @@ function load(){
   if (local && (!EMBEDDED || num(local.savedAt) >= num(EMBEDDED.savedAt))) DB = local;
   else DB = EMBEDDED ? JSON.parse(JSON.stringify(EMBEDDED)) : emptyDB();
 }
+var CLOUD = !!(window.FIREBASE_CONFIG && FIREBASE_CONFIG.apiKey);
+var fs = null, auth = null, USER = null, unsubs = [];
+var REMOTE = { customers:{}, models:{}, records:{} }, READY = {};
+var entryDirty = false, saving = 0;
+
 function save(msg){
+  if (CLOUD) return cloudSave(msg);
   DB.savedAt = Date.now();
   if (!lsSet(LS_KEY, JSON.stringify(DB))) toast('브라우저 저장에 실패했습니다. JSON 백업을 받아두세요.');
   else if (msg) toast(msg);
   renderAll();
 }
+function localData(){
+  var emb = null, local = null;
+  try { emb = JSON.parse($('#embedded-data').textContent); } catch(e){}
+  try { local = JSON.parse(lsGet(LS_KEY) || 'null'); } catch(e){}
+  if (!valid(emb)) emb = null; if (!valid(local)) local = null;
+  if (local && (!emb || num(local.savedAt) >= num(emb.savedAt))) return local;
+  return emb;
+}
+
+// ---------- Firebase (실시간 공유) ----------
+function clean(o){ return JSON.parse(JSON.stringify(o)); }
+function stable(o){
+  if (o === null || typeof o !== 'object') return JSON.stringify(o);
+  if (Array.isArray(o)) return '[' + o.map(stable).join(',') + ']';
+  return '{' + Object.keys(o).sort().map(function(k){ return JSON.stringify(k) + ':' + stable(o[k]); }).join(',') + '}';
+}
+function same(a,b){ return stable(clean(a)) === stable(clean(b)); }
+function vals(map){ return Object.keys(map).sort().map(function(k){ return clean(map[k]); }); }
+function buildDB(){
+  var d = emptyDB();
+  d.customers = vals(REMOTE.customers); d.models = vals(REMOTE.models); d.records = vals(REMOTE.records);
+  return d;
+}
+function gate(msg, isErr, denied){
+  $('#gate').classList.toggle('show', msg !== null);
+  if (msg === null) return;
+  $('#gateMsg').textContent = msg; $('#gateMsg').classList.toggle('err', !!isErr);
+  $('#btnLogin').style.display = denied ? 'none' : '';
+  $('#btnLogin2').style.display = denied ? '' : 'none';
+}
+function cloudInit(){
+  document.body.classList.add('cloud');
+  DB = emptyDB();
+  if (typeof firebase === 'undefined'){ gate('Firebase를 불러오지 못했습니다. 인터넷 연결을 확인하고 새로고침하세요.', true); return; }
+  try {
+    firebase.initializeApp(FIREBASE_CONFIG);
+    auth = firebase.auth(); fs = firebase.firestore();
+  } catch(e){ gate('Firebase 설정값이 올바르지 않습니다: ' + e.message, true); return; }
+  gate('로그인 상태를 확인하는 중…');
+  auth.getRedirectResult().catch(function(e){ gate('로그인 실패: ' + e.message, true); });
+  auth.onAuthStateChanged(function(u){
+    stopSync(); USER = u;
+    if (!u){ DB = emptyDB(); gate('등록된 Google 계정으로 로그인하세요.'); renderStatus(); return; }
+    $('#userEmail').textContent = u.email;
+    gate('데이터를 불러오는 중…');
+    startSync();
+  });
+}
+function login(){
+  var p = new firebase.auth.GoogleAuthProvider();
+  p.setCustomParameters({ prompt:'select_account' });
+  auth.signInWithPopup(p).catch(function(e){
+    if (e.code === 'auth/popup-blocked' || e.code === 'auth/operation-not-supported-in-this-environment') auth.signInWithRedirect(p);
+    else if (e.code === 'auth/unauthorized-domain') gate('이 주소가 Firebase 승인 도메인에 없습니다. Authentication → 설정 → 승인된 도메인에 추가하세요.', true);
+    else if (e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request') gate('로그인 실패: ' + e.message, true);
+  });
+}
+function stopSync(){ unsubs.forEach(function(f){ f(); }); unsubs = []; REMOTE = { customers:{}, models:{}, records:{} }; READY = {}; }
+function onSyncError(e){
+  stopSync();
+  if (e.code === 'permission-denied') gate((USER ? USER.email : '이 계정') + ' 계정은 접근 권한이 없습니다. 관리자에게 등록을 요청하세요.', true, true);
+  else gate('데이터 연결 오류: ' + e.message, true, true);
+}
+function startSync(){
+  function watchCol(name, key){
+    unsubs.push(fs.collection(name).onSnapshot(function(snap){
+      var m = {}; snap.forEach(function(doc){ var o = doc.data(); o.id = doc.id; m[doc.id] = o; });
+      REMOTE[key] = m; READY[key] = 1; remoteChanged();
+    }, onSyncError));
+  }
+  watchCol('as_customers', 'customers');
+  watchCol('as_models', 'models');
+  unsubs.push(fs.collection('as_months').onSnapshot(function(snap){
+    var m = {};
+    snap.forEach(function(doc){ var r = (doc.data() || {}).r || {}; Object.keys(r).forEach(function(id){ var o = r[id]; o.id = id; m[id] = o; }); });
+    REMOTE.records = m; READY.records = 1; remoteChanged();
+  }, onSyncError));
+}
+function remoteChanged(){
+  if (!(READY.customers && READY.models && READY.records)) return;
+  gate(null);
+  DB = buildDB();
+  // 입력 중인 화면은 덮어쓰지 않음
+  renderFilters(); renderDashboard();
+  if (!entryDirty) renderEntry();
+  renderRecList();
+  var a = document.activeElement;
+  if (!(a && a.tagName === 'INPUT' && $('#tab-master').contains(a))) renderMaster();
+  renderDataInfo(); renderStatus();
+}
+function cloudSave(msg){
+  renderAll();
+  var ops = [];
+  [['customers','as_customers'],['models','as_models']].forEach(function(c){
+    var key = c[0], col = fs.collection(c[1]), local = {};
+    DB[key].forEach(function(o){ local[o.id] = o; });
+    Object.keys(local).forEach(function(id){ if (!REMOTE[key][id] || !same(local[id], REMOTE[key][id])) ops.push({ ref:col.doc(id), data:clean(local[id]) }); });
+    Object.keys(REMOTE[key]).forEach(function(id){ if (!local[id]) ops.push({ ref:col.doc(id), del:true }); });
+  });
+  var months = {}, del = firebase.firestore.FieldValue.delete(), localR = {};
+  function put(ym, id, v){ (months[ym] = months[ym] || {})[id] = v; }
+  DB.records.forEach(function(r){ localR[r.id] = r; });
+  Object.keys(localR).forEach(function(id){
+    var r = localR[id], old = REMOTE.records[id];
+    if (old && same(r, old)) return;
+    if (old && old.date.slice(0,7) !== r.date.slice(0,7)) put(old.date.slice(0,7), id, del);
+    put(r.date.slice(0,7), id, clean(r));
+  });
+  Object.keys(REMOTE.records).forEach(function(id){ if (!localR[id]) put(REMOTE.records[id].date.slice(0,7), id, del); });
+  Object.keys(months).forEach(function(ym){ ops.push({ ref:fs.collection('as_months').doc(ym), data:{ r:months[ym] }, merge:true }); });
+  if (!ops.length){ if (msg) toast(msg); return; }
+
+  var chunks = []; for (var i=0; i<ops.length; i+=400) chunks.push(ops.slice(i, i+400));
+  saving++; renderStatus();
+  chunks.reduce(function(p, ch){
+    return p.then(function(){
+      var b = fs.batch();
+      ch.forEach(function(o){ if (o.del) b.delete(o.ref); else if (o.merge) b.set(o.ref, o.data, { merge:true }); else b.set(o.ref, o.data); });
+      return b.commit();
+    });
+  }, Promise.resolve()).then(function(){
+    saving--; renderStatus(); if (msg) toast(msg);
+  }).catch(function(e){
+    saving--;
+    toast(e.code === 'permission-denied' ? '입력 권한이 없는 계정입니다. 변경 내용이 저장되지 않았습니다.' : '저장 실패: ' + e.message);
+    DB = buildDB(); renderAll();
+  });
+}
+
 function hasUnexported(){
+  if (CLOUD) return false;
   var emb = EMBEDDED ? num(EMBEDDED.savedAt) : 0;
   var exp = num(lsGet(LS_EXPORT));
   return num(DB.savedAt) > Math.max(emb, exp);
 }
 function renderStatus(){
   var el = $('#saveStatus');
+  if (CLOUD){
+    if (!USER){ el.className = 'status'; el.textContent = '로그인 필요'; }
+    else if (!navigator.onLine){ el.className = 'status warn'; el.textContent = '오프라인 · 연결되면 자동 저장'; }
+    else if (saving){ el.className = 'status'; el.textContent = '저장 중…'; }
+    else { el.className = 'status live'; el.textContent = '● 실시간 연결됨'; }
+    return;
+  }
   if (hasUnexported()){ el.className = 'status warn'; el.textContent = '브라우저에만 저장됨 · GitHub 반영 전'; }
   else { el.className = 'status'; el.textContent = DB.savedAt ? '저장됨 · ' + new Date(DB.savedAt).toLocaleString('ko-KR') : '데이터 없음'; }
 }
@@ -421,6 +620,7 @@ function drawShare(share){
 
 // ---------- 실적 입력 ----------
 function renderEntry(){
+  entryDirty = false;
   custOptions($('#eCust'), false);
   var date = $('#eDate').value, cid = $('#eCust').value;
   var ms = DB.models.filter(function(m){ return m.cid===cid; });
@@ -464,7 +664,7 @@ function saveEntry(){
     var idx = DB.records.findIndex(function(x){ return x.date===date && x.mid===mid; });
     var isEmpty = !o.recv && !o.done && !o.extra && !o.memo;
     if (isEmpty){ if (idx>=0){ DB.records.splice(idx,1); changed++; } return; }
-    var rec = { id: idx>=0 ? DB.records[idx].id : uid(), date:date, cid:cid, mid:mid, recv:o.recv, done:o.done, price:o.price, extra:o.extra, memo:o.memo };
+    var rec = { id: idx>=0 ? DB.records[idx].id : (date + '_' + mid), date:date, cid:cid, mid:mid, recv:o.recv, done:o.done, price:o.price, extra:o.extra, memo:o.memo };
     if (idx>=0) DB.records[idx] = rec; else DB.records.push(rec);
     changed++;
   });
@@ -557,6 +757,11 @@ function downloadHtml(){
   toast(name + ' 을(를) 받았습니다. GitHub에 덮어써서 커밋하세요.');
 }
 function renderDataInfo(){
+  if (CLOUD){
+    $('#dataInfo').innerHTML = '고객사 '+DB.customers.length+'곳 · 모델 '+DB.models.length+'개 · 실적 '+DB.records.length+'행<br>'+
+      '접속 계정: '+esc(USER ? USER.email : '-')+'<br>Firebase 프로젝트: '+esc(FIREBASE_CONFIG.projectId);
+    return;
+  }
   var emb = EMBEDDED ? new Date(EMBEDDED.savedAt).toLocaleString('ko-KR') : '없음';
   $('#dataInfo').innerHTML =
     '고객사 '+DB.customers.length+'곳 · 모델 '+DB.models.length+'개 · 실적 '+DB.records.length+'행<br>'+
@@ -595,7 +800,7 @@ function bind(){
   });
   $('#eDate').addEventListener('change', renderEntry);
   $('#eCust').addEventListener('change', renderEntry);
-  $('#entryGrid').addEventListener('input', updateEntrySums);
+  $('#entryGrid').addEventListener('input', function(){ entryDirty = true; updateEntrySums(); });
   $('#entryGrid').addEventListener('keydown', function(e){ if (e.key==='Enter'){ e.preventDefault(); saveEntry(); } });
   $('#btnSaveEntry').addEventListener('click', saveEntry);
   $('#lMonth').addEventListener('change', renderRecList);
@@ -644,6 +849,20 @@ function bind(){
     }
   });
   $('#btnDlHtml').addEventListener('click', downloadHtml);
+  $('#btnLogin').addEventListener('click', login);
+  $('#btnLogin2').addEventListener('click', function(){ auth.signOut().then(login); });
+  $('#btnLogout').addEventListener('click', function(){ if (auth) auth.signOut(); });
+  window.addEventListener('online', renderStatus); window.addEventListener('offline', renderStatus);
+  $('#btnMigrate').addEventListener('click', function(){
+    var L = localData();
+    if (!L || !(L.customers.length || L.models.length || L.records.length)){ toast('이 브라우저에 저장된 기존 데이터가 없습니다.'); return; }
+    var have = {}; ['customers','models','records'].forEach(function(k){ DB[k].forEach(function(o){ have[k+o.id] = 1; }); });
+    var add = { customers:0, models:0, records:0 };
+    ['customers','models','records'].forEach(function(k){ L[k].forEach(function(o){ if (!have[k+o.id]){ DB[k].push(o); add[k]++; } }); });
+    if (!add.customers && !add.models && !add.records){ toast('이미 모두 업로드되어 있습니다.'); DB = buildDB(); return; }
+    if (!confirm('기존 데이터를 Firebase에 추가할까요?\n고객사 '+add.customers+' · 모델 '+add.models+' · 실적 '+add.records+'행 (이미 있는 항목은 건너뜁니다)')){ DB = buildDB(); return; }
+    save('기존 데이터를 업로드했습니다.');
+  });
   $('#btnDlJson').addEventListener('click', function(){
     download('as_revenue_backup_'+today()+'.json', JSON.stringify(DB, null, 2), 'application/json');
   });
@@ -678,10 +897,12 @@ function bind(){
 }
 
 // ---------- 시작 ----------
-load();
 $('#eDate').value = today();
 $('#lMonth').value = today().slice(0,7);
 bind();
-renderAll();
+if (CLOUD){ cloudInit(); renderAll(); }
+else { load(); renderAll(); }
 })();
-</script></body></html>
+</script>
+</body>
+</html>
