@@ -109,6 +109,25 @@ body:not(.cloud) .cloud-only{display:none!important}
 .gate-card .btn+.btn{margin-top:8px}
 .badge{display:inline-block;padding:1px 7px;border-radius:5px;font-size:10px;background:var(--accent-glow);color:var(--accent)}
 @media (max-width:860px){.grid2{grid-template-columns:1fr} header{position:static} main,nav{padding-left:16px;padding-right:16px}}
+@media (max-width:600px){
+  .kpis{grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
+  .kpi{padding:9px 11px;border-radius:10px}
+  .kpi .l{font-size:10px;letter-spacing:.04em}
+  .kpi .v{font-size:16px;margin-top:2px;letter-spacing:-.3px}
+  .kpi .s{font-size:10.5px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .kpi:nth-child(4){grid-column:1/-1;order:-1}
+  .kpi:nth-child(4) .v{font-size:19px}
+  .tab{padding:14px}
+  .chartwrap{height:240px}
+  header{padding:8px 16px;min-height:0;gap:6px}
+  header h1{font-size:14px}
+  .status{font-size:11px;padding:3px 9px}
+  .userbox{font-size:11px}
+  nav{flex-wrap:nowrap;overflow-x:auto;padding-top:10px;gap:2px;scrollbar-width:none}
+  nav::-webkit-scrollbar{display:none}
+  nav button{flex:0 0 auto;padding:7px 12px;font-size:12.5px}
+  main{padding-top:8px}
+}
 </style>
 </head>
 <body>
