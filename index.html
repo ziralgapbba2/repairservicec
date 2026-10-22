@@ -107,6 +107,9 @@ body:not(.cloud) .cloud-only{display:none!important}
 .gate-card p.err{color:var(--danger)}
 .gate-card .btn{width:100%;padding:11px}
 .gate-card .btn+.btn{margin-top:8px}
+.gate-card input{width:100%;margin-bottom:8px;text-align:left}
+.gate-or{display:flex;align-items:center;gap:10px;font-size:11px;color:var(--text3);margin:18px 0 12px}
+.gate-or::before,.gate-or::after{content:"";flex:1;height:1px;background:var(--border)}
 .badge{display:inline-block;padding:1px 7px;border-radius:5px;font-size:10px;background:var(--accent-glow);color:var(--accent)}
 @media (max-width:860px){.grid2{grid-template-columns:1fr} header{position:static} main,nav{padding-left:16px;padding-right:16px}}
 @media (max-width:600px){
@@ -147,8 +150,17 @@ body:not(.cloud) .cloud-only{display:none!important}
   <div class="gate-card">
     <div class="logo">J2L<span>FLOW</span></div>
     <h3>AS 실적·매출 관리</h3>
-    <p id="gateMsg">등록된 Google 계정으로 로그인하세요.</p>
-    <button class="btn" id="btnLogin">Google 계정으로 로그인</button>
+    <p id="gateMsg">등록된 계정으로 로그인하세요.</p>
+    <div id="gLogin">
+      <button class="btn" id="btnLogin">Google 계정으로 로그인</button>
+      <div class="gate-or">또는 이메일로 로그인</div>
+      <input type="email" id="gateEmail" placeholder="회사·네이버 등 이메일 주소" autocomplete="email">
+      <button class="btn ghost" id="btnEmailLink">로그인 링크 받기</button>
+    </div>
+    <div id="gConfirm">
+      <input type="email" id="gateEmail2" placeholder="로그인 링크를 받은 이메일 주소" autocomplete="email">
+      <button class="btn" id="btnEmailConfirm">로그인 완료</button>
+    </div>
     <button class="btn ghost" id="btnLogin2" style="display:none">다른 계정으로 로그인</button>
   </div>
 </div>
@@ -271,13 +283,13 @@ body:not(.cloud) .cloud-only{display:none!important}
    (이 값은 공개돼도 괜찮습니다. 접근 권한은 Firestore 보안 규칙으로 막습니다.)
    ============================================================ */
 var FIREBASE_CONFIG = {
-  apiKey: "",
-  authDomain: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: ""
-};
+  apiKey: "AIza....",
+     authDomain: "....firebaseapp.com",
+     projectId: "....",
+     storageBucket: "....",
+     messagingSenderId: "....",
+     appId: "...."
+   };
 </script>
 
 <script>
@@ -354,28 +366,70 @@ function buildDB(){
   d.customers = vals(REMOTE.customers); d.models = vals(REMOTE.models); d.records = vals(REMOTE.records);
   return d;
 }
-function gate(msg, isErr, denied){
+// mode: 'login'(로그인 버튼) | 'wait'(안내만) | 'denied'(권한 없음) | 'confirm'(이메일 재입력)
+function gate(msg, isErr, mode){
   $('#gate').classList.toggle('show', msg !== null);
   if (msg === null) return;
+  mode = mode || 'login';
   $('#gateMsg').textContent = msg; $('#gateMsg').classList.toggle('err', !!isErr);
-  $('#btnLogin').style.display = denied ? 'none' : '';
-  $('#btnLogin2').style.display = denied ? '' : 'none';
+  $('#gLogin').style.display = mode === 'login' ? '' : 'none';
+  $('#gConfirm').style.display = mode === 'confirm' ? '' : 'none';
+  $('#btnLogin2').style.display = mode === 'denied' ? '' : 'none';
+}
+// ---- 이메일 링크 로그인 ----
+var LS_SIGNIN = 'j2l_signin_email', linkPending = false;
+function pageUrl(){ return location.origin + location.pathname; }
+function validEmail(v){ return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v); }
+function sendLink(){
+  var em = $('#gateEmail').value.trim();
+  if (!validEmail(em)){ gate('이메일 주소를 확인하세요.', true); return; }
+  var b = $('#btnEmailLink'); b.disabled = true; b.textContent = '보내는 중…';
+  auth.sendSignInLinkToEmail(em, { url: pageUrl(), handleCodeInApp: true }).then(function(){
+    lsSet(LS_SIGNIN, em);
+    gate(em + ' 주소로 로그인 링크를 보냈습니다. 메일함(스팸함 포함)에서 링크를 누르세요. 이 창은 닫아도 됩니다.', false, 'wait');
+  }).catch(function(e){
+    var m = e.code === 'auth/quota-exceeded' ? '오늘 보낼 수 있는 로그인 메일 수를 넘었습니다. 내일 다시 시도하거나 Google 계정으로 로그인하세요.'
+      : e.code === 'auth/operation-not-allowed' ? 'Firebase에서 이메일 링크 로그인이 켜져 있지 않습니다. 관리자에게 문의하세요.'
+      : e.code === 'auth/unauthorized-continue-uri' ? '이 주소가 Firebase 승인 도메인에 없습니다.'
+      : '메일 발송 실패: ' + e.message;
+    gate(m, true);
+  }).then(function(){ b.disabled = false; b.textContent = '로그인 링크 받기'; });
+}
+function finishLink(em){
+  gate('로그인하는 중…', false, 'wait');
+  auth.signInWithEmailLink(em, location.href).then(function(){
+    linkPending = false; lsDel(LS_SIGNIN);
+    history.replaceState(null, '', pageUrl());
+  }).catch(function(e){
+    linkPending = false; history.replaceState(null, '', pageUrl());
+    gate(e.code === 'auth/invalid-action-code' || e.code === 'auth/expired-action-code' ? '링크가 만료되었거나 이미 사용되었습니다. 로그인 링크를 다시 받으세요.'
+      : e.code === 'auth/invalid-email' ? '링크를 요청한 이메일 주소와 다릅니다. 다시 시도하세요.'
+      : '로그인 실패: ' + e.message, true);
+  });
+}
+function checkLink(){
+  if (!auth.isSignInWithEmailLink(location.href)) return;
+  linkPending = true;
+  var em = lsGet(LS_SIGNIN);
+  if (em) finishLink(em);
+  else gate('보안을 위해 로그인 링크를 받은 이메일 주소를 한 번 더 입력하세요.', false, 'confirm');
 }
 function cloudInit(){
   document.body.classList.add('cloud');
   DB = emptyDB();
-  if (typeof firebase === 'undefined'){ gate('Firebase를 불러오지 못했습니다. 인터넷 연결을 확인하고 새로고침하세요.', true); return; }
+  if (typeof firebase === 'undefined'){ gate('Firebase를 불러오지 못했습니다. 인터넷 연결을 확인하고 새로고침하세요.', true, 'wait'); return; }
   try {
     firebase.initializeApp(FIREBASE_CONFIG);
     auth = firebase.auth(); fs = firebase.firestore();
-  } catch(e){ gate('Firebase 설정값이 올바르지 않습니다: ' + e.message, true); return; }
-  gate('로그인 상태를 확인하는 중…');
+  } catch(e){ gate('Firebase 설정값이 올바르지 않습니다: ' + e.message, true, 'wait'); return; }
+  gate('로그인 상태를 확인하는 중…', false, 'wait');
+  checkLink();
   auth.getRedirectResult().catch(function(e){ gate('로그인 실패: ' + e.message, true); });
   auth.onAuthStateChanged(function(u){
     stopSync(); USER = u;
-    if (!u){ DB = emptyDB(); gate('등록된 Google 계정으로 로그인하세요.'); renderStatus(); return; }
+    if (!u){ DB = emptyDB(); renderStatus(); if (!linkPending) gate('등록된 계정으로 로그인하세요.'); return; }
     $('#userEmail').textContent = u.email;
-    gate('데이터를 불러오는 중…');
+    gate('데이터를 불러오는 중…', false, 'wait');
     startSync();
   });
 }
@@ -391,8 +445,8 @@ function login(){
 function stopSync(){ unsubs.forEach(function(f){ f(); }); unsubs = []; REMOTE = { customers:{}, models:{}, records:{} }; READY = {}; }
 function onSyncError(e){
   stopSync();
-  if (e.code === 'permission-denied') gate((USER ? USER.email : '이 계정') + ' 계정은 접근 권한이 없습니다. 관리자에게 등록을 요청하세요.', true, true);
-  else gate('데이터 연결 오류: ' + e.message, true, true);
+  if (e.code === 'permission-denied') gate((USER ? USER.email : '이 계정') + ' 계정은 접근 권한이 없습니다. 관리자에게 등록을 요청하세요.', true, 'denied');
+  else gate('데이터 연결 오류: ' + e.message, true, 'denied');
 }
 function startSync(){
   function watchCol(name, key){
@@ -869,7 +923,14 @@ function bind(){
   });
   $('#btnDlHtml').addEventListener('click', downloadHtml);
   $('#btnLogin').addEventListener('click', login);
-  $('#btnLogin2').addEventListener('click', function(){ auth.signOut().then(login); });
+  $('#btnLogin2').addEventListener('click', function(){ auth.signOut(); });
+  $('#btnEmailLink').addEventListener('click', sendLink);
+  $('#gateEmail').addEventListener('keydown', function(e){ if (e.key === 'Enter') sendLink(); });
+  $('#btnEmailConfirm').addEventListener('click', function(){
+    var em = $('#gateEmail2').value.trim();
+    if (!validEmail(em)){ gate('이메일 주소를 확인하세요.', true, 'confirm'); return; }
+    finishLink(em);
+  });
   $('#btnLogout').addEventListener('click', function(){ if (auth) auth.signOut(); });
   window.addEventListener('online', renderStatus); window.addEventListener('offline', renderStatus);
   $('#btnMigrate').addEventListener('click', function(){
